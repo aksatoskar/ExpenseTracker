@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -66,6 +68,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -141,7 +145,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
@@ -957,11 +963,61 @@ fun InsightList(state: DashboardState, budgets: List<BudgetEntity>) {
     }
 }
 
+private enum class TxnSort(val label: String) {
+    DateNewest("Newest first"),
+    DateOldest("Oldest first"),
+    AmountHigh("Amount: High to Low"),
+    AmountLow("Amount: Low to High")
+}
+
+private enum class TxnPeriod(val label: String) {
+    All("All"),
+    Today("Today"),
+    Week("Week"),
+    Month("Month"),
+    Year("Year")
+}
+
+private fun periodStartMillis(period: TxnPeriod): Long {
+    if (period == TxnPeriod.All) return Long.MIN_VALUE
+    val today = LocalDate.now()
+    val date = when (period) {
+        TxnPeriod.Today -> today
+        TxnPeriod.Week -> today.minusDays((today.dayOfWeek.value - 1).toLong())
+        TxnPeriod.Month -> today.withDayOfMonth(1)
+        TxnPeriod.Year -> today.withDayOfYear(1)
+        TxnPeriod.All -> today
+    }
+    return date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(vm: ExpenseViewModel, openReview: (Long) -> Unit) {
     val all by vm.all.collectAsState()
     var query by remember { mutableStateOf("") }
-    val filtered = all.filter { it.merchant.contains(query, ignoreCase = true) }
+    var sort by remember { mutableStateOf(TxnSort.DateNewest) }
+    var period by remember { mutableStateOf(TxnPeriod.All) }
+    var categoryFilter by remember { mutableStateOf<Category?>(null) }
+
+    val periodStart = remember(period) { periodStartMillis(period) }
+    val result = remember(all, query, sort, period, periodStart, categoryFilter) {
+        all.asSequence()
+            .filter { it.merchant.contains(query, ignoreCase = true) }
+            .filter { period == TxnPeriod.All || it.timestamp >= periodStart }
+            .filter { categoryFilter == null || it.category == categoryFilter }
+            .toList()
+            .let { list ->
+                when (sort) {
+                    TxnSort.DateNewest -> list.sortedByDescending { it.timestamp }
+                    TxnSort.DateOldest -> list.sortedBy { it.timestamp }
+                    TxnSort.AmountHigh -> list.sortedByDescending { it.amountPaise }
+                    TxnSort.AmountLow -> list.sortedBy { it.amountPaise }
+                }
+            }
+    }
+    val resultTotal = remember(result) { result.sumOf { it.amountPaise } }
+
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Text("Transactions", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -974,7 +1030,113 @@ fun TransactionsScreen(vm: ExpenseViewModel, openReview: (Long) -> Unit) {
                 shape = RoundedCornerShape(14.dp)
             )
         }
-        items(filtered) { TransactionRow(it, onClick = { openReview(it.id) }) }
+        item {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TxnPeriod.entries.forEach { p ->
+                    FilterChip(
+                        selected = period == p,
+                        onClick = { period = p },
+                        label = { Text(p.label) },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterDropdown(
+                    label = "Sort by",
+                    value = sort.label,
+                    options = TxnSort.entries.map { it.label },
+                    onSelect = { sort = TxnSort.entries[it] },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterDropdown(
+                    label = "Category",
+                    value = categoryFilter?.label ?: "All",
+                    options = listOf("All") + Category.entries.map { it.label },
+                    onSelect = { i -> categoryFilter = if (i == 0) null else Category.entries[i - 1] },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "${result.size} ${if (result.size == 1) "transaction" else "transactions"}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    formatInr(resultTotal),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        if (result.isEmpty()) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        "No transactions match your filters.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        items(result) { TransactionRow(it, onClick = { openReview(it.id) }) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterDropdown(
+    label: String,
+    value: String,
+    options: List<String>,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            readOnly = true,
+            value = value,
+            onValueChange = {},
+            singleLine = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEachIndexed { index, option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onSelect(index)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }
 
