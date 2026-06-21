@@ -2,6 +2,7 @@ package com.example.expensetracker.notifications
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.example.expensetracker.domain.crash.CrashReporter
 import com.example.expensetracker.domain.parser.NotificationTextExtractor
 import com.example.expensetracker.domain.parser.TransactionParser
 import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
@@ -23,6 +24,7 @@ class PaymentNotificationListener : NotificationListenerService() {
 
     @Inject lateinit var ingestTransaction: IngestTransactionUseCase
     @Inject lateinit var parser: TransactionParser
+    @Inject lateinit var crashReporter: CrashReporter
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -43,6 +45,7 @@ class PaymentNotificationListener : NotificationListenerService() {
             try {
                 ingestTransaction(parsed)
             } catch (e: Exception) {
+                crashReporter.recordNonFatal(e)
                 IngestWorker.enqueue(appContext, parsed)
             }
         }

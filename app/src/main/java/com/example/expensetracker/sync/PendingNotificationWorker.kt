@@ -7,6 +7,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.example.expensetracker.domain.crash.CrashReporter
 import com.example.expensetracker.domain.usecase.transaction.NotifyPendingUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -16,7 +17,8 @@ import dagger.assisted.AssistedInject
 class PendingNotificationWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val notifyPending: NotifyPendingUseCase
+    private val notifyPending: NotifyPendingUseCase,
+    private val crashReporter: CrashReporter
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -24,6 +26,7 @@ class PendingNotificationWorker @AssistedInject constructor(
             notifyPending()
             Result.success()
         } catch (e: Exception) {
+            crashReporter.recordNonFatal(e)
             Result.retry()
         }
     }

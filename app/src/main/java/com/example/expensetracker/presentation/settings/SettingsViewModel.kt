@@ -2,6 +2,8 @@ package com.example.expensetracker.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.expensetracker.domain.analytics.AnalyticsEvent
+import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.notification.Notifier
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
@@ -22,7 +24,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val syncSmsInbox: SyncSmsInboxUseCase,
-    private val notifier: Notifier
+    private val notifier: Notifier,
+    private val analytics: AnalyticsTracker
 ) : ViewModel() {
 
     val darkTheme: StateFlow<Boolean> =
@@ -44,6 +47,7 @@ class SettingsViewModel @Inject constructor(
         _isSyncing.value = true
         viewModelScope.launch {
             val count = runCatching { syncSmsInbox() }.getOrDefault(0)
+            if (count >= 0) analytics.log(AnalyticsEvent.SmsSynced(count))
             _isSyncing.value = false
             onResult(count)
         }

@@ -7,6 +7,8 @@ import com.example.expensetracker.core.time.DateRange
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
+import com.example.expensetracker.domain.analytics.AnalyticsEvent
+import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.model.AmountByCategory
 import com.example.expensetracker.domain.model.Category
 import com.example.expensetracker.domain.repository.BudgetRepository
@@ -26,7 +28,8 @@ class BudgetViewModel @Inject constructor(
     budgetRepository: BudgetRepository,
     transactionRepository: TransactionRepository,
     private val upsertBudget: UpsertBudgetUseCase,
-    private val deleteBudgetUseCase: DeleteBudgetUseCase
+    private val deleteBudgetUseCase: DeleteBudgetUseCase,
+    private val analytics: AnalyticsTracker
 ) : ViewModel() {
 
     val budgets: StateFlow<List<BudgetEntity>> =
@@ -44,10 +47,16 @@ class BudgetViewModel @Inject constructor(
 
     fun saveBudget(category: Category, amountRupees: String, existing: BudgetEntity?) {
         val amount = amountRupees.toDoubleOrNull() ?: return
-        viewModelScope.launch { upsertBudget(category, rupeesToPaise(amount), existing) }
+        viewModelScope.launch {
+            upsertBudget(category, rupeesToPaise(amount), existing)
+            analytics.log(AnalyticsEvent.BudgetSet(category))
+        }
     }
 
     fun deleteBudget(budget: BudgetEntity) {
-        viewModelScope.launch { deleteBudgetUseCase(budget.id) }
+        viewModelScope.launch {
+            deleteBudgetUseCase(budget.id)
+            analytics.log(AnalyticsEvent.BudgetDeleted(budget.category))
+        }
     }
 }

@@ -9,6 +9,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.example.expensetracker.domain.crash.CrashReporter
 import com.example.expensetracker.domain.model.ParsedTransaction
 import com.example.expensetracker.domain.model.TransactionType
 import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
@@ -21,7 +22,8 @@ import java.util.concurrent.TimeUnit
 class IngestWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val ingestTransaction: IngestTransactionUseCase
+    private val ingestTransaction: IngestTransactionUseCase,
+    private val crashReporter: CrashReporter
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -30,6 +32,7 @@ class IngestWorker @AssistedInject constructor(
             ingestTransaction(parsed)
             Result.success()
         } catch (e: Exception) {
+            crashReporter.recordNonFatal(e)
             Result.retry()
         }
     }

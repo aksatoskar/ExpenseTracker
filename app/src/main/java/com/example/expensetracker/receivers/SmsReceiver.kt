@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import com.example.expensetracker.domain.crash.CrashReporter
 import com.example.expensetracker.domain.parser.TransactionParser
 import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
 import com.example.expensetracker.sync.IngestWorker
@@ -30,6 +31,7 @@ class SmsReceiver : BroadcastReceiver() {
     interface SmsReceiverEntryPoint {
         fun ingestTransactionUseCase(): IngestTransactionUseCase
         fun transactionParser(): TransactionParser
+        fun crashReporter(): CrashReporter
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -51,6 +53,7 @@ class SmsReceiver : BroadcastReceiver() {
             try {
                 ingestTransaction(parsed)
             } catch (e: Exception) {
+                entryPoint.crashReporter().recordNonFatal(e)
                 IngestWorker.enqueue(appContext, parsed)
             } finally {
                 pendingResult.finish()

@@ -72,7 +72,8 @@ fun ExpenseApp(startReviewId: Long?) {
                     LaunchedEffect(Unit) { appVm.runStartupTasks() }
                     AppShell(
                         openReview = { reviewId = it },
-                        openBudget = { budgetCategory = it }
+                        openBudget = { budgetCategory = it },
+                        logScreen = appVm::logScreen
                     )
                     budgetCategory?.let { cat ->
                         BudgetDetailScreen(
@@ -107,12 +108,13 @@ fun ExpenseApp(startReviewId: Long?) {
 }
 
 @Composable
-private fun AppShell(openReview: (Long) -> Unit, openBudget: (Category) -> Unit) {
+private fun AppShell(openReview: (Long) -> Unit, openBudget: (Category) -> Unit, logScreen: (String) -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddTransaction by remember { mutableStateOf(false) }
     val dashboardVm: DashboardViewModel = hiltViewModel()
     val tabs = listOf("Home", "Txns", "Charts", "Budget", "Settings")
     val icons = listOf(Icons.Default.Dashboard, Icons.Default.ReceiptLong, Icons.Default.Analytics, Icons.Default.Payments, Icons.Default.Settings)
+    LaunchedEffect(tab) { logScreen(tabs[tab]) }
     Scaffold(
         floatingActionButton = {
             if (tab == 0) {

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.expensetracker.core.money.rupeesToPaise
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
+import com.example.expensetracker.domain.analytics.AnalyticsEvent
+import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.model.Category
 import com.example.expensetracker.domain.model.DashboardState
 import com.example.expensetracker.domain.model.Priority
@@ -33,7 +35,8 @@ class DashboardViewModel @Inject constructor(
     observeDashboard: ObserveDashboardUseCase,
     transactionRepository: TransactionRepository,
     budgetRepository: BudgetRepository,
-    private val addManualTransaction: AddManualTransactionUseCase
+    private val addManualTransaction: AddManualTransactionUseCase,
+    private val analytics: AnalyticsTracker
 ) : ViewModel() {
 
     val uiState: StateFlow<DashboardUiState> = combine(
@@ -65,6 +68,7 @@ class DashboardViewModel @Inject constructor(
                 notes = notes.trim(),
                 timestamp = timestamp
             )
+            analytics.log(AnalyticsEvent.ManualTransactionAdded(category))
         }
         return true
     }

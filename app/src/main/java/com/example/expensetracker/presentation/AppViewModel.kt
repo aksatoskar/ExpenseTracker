@@ -2,6 +2,8 @@ package com.example.expensetracker.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.expensetracker.domain.analytics.AnalyticsEvent
+import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.usecase.budget.RenewBudgetsUseCase
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
@@ -28,7 +30,8 @@ data class AppUiState(
 class AppViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val syncSmsInbox: SyncSmsInboxUseCase,
-    private val renewBudgets: RenewBudgetsUseCase
+    private val renewBudgets: RenewBudgetsUseCase,
+    private val analytics: AnalyticsTracker
 ) : ViewModel() {
 
     val uiState: StateFlow<AppUiState> = combine(
@@ -44,12 +47,18 @@ class AppViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setOnboardingComplete(true) }
     }
 
+    /** Reports a bottom-nav screen view to analytics. */
+    fun logScreen(name: String) = analytics.logScreen(name)
+
     /** Runs once per process: recover missed SMS transactions and renew budgets if needed. */
     fun runStartupTasks() {
         if (startupTriggered) return
         startupTriggered = true
         viewModelScope.launch {
             runCatching { syncSmsInbox() }
+                .getOrNull()
+                ?.takeIf { it >= 0 }
+                ?.let { analytics.log(AnalyticsEvent.SmsSynced(it)) }
             runCatching { renewBudgets() }
         }
     }
