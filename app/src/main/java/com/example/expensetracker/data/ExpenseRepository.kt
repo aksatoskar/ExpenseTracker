@@ -124,11 +124,13 @@ class ExpenseRepository(
 
     suspend fun saveReview(
         transaction: TransactionEntity,
+        amountPaise: Long,
         category: Category,
         priority: Priority,
         notes: String
     ) {
         val reviewed = transaction.copy(
+            amountPaise = amountPaise,
             category = category,
             priority = priority,
             notes = notes,
@@ -149,6 +151,40 @@ class ExpenseRepository(
 
     suspend fun skip(transaction: TransactionEntity) {
         dao.updateTransaction(transaction.copy(status = TransactionStatus.Skipped))
+    }
+
+    suspend fun addManualTransaction(
+        amountPaise: Long,
+        merchant: String,
+        category: Category,
+        priority: Priority,
+        notes: String,
+        timestamp: Long
+    ) {
+        val transaction = TransactionEntity(
+            amountPaise = amountPaise,
+            merchant = merchant,
+            type = TransactionType.Debit,
+            timestamp = timestamp,
+            source = "Manual",
+            rawText = "Manually added",
+            category = category,
+            priority = priority,
+            notes = notes,
+            status = TransactionStatus.Reviewed,
+            notified = true
+        )
+        dao.insertTransaction(transaction)
+        dao.upsertMerchantRule(
+            MerchantRuleEntity(
+                merchantKey = normalizeMerchant(merchant),
+                displayMerchant = merchant,
+                category = category,
+                priority = priority,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+        checkBudgetAlerts(category)
     }
 
     suspend fun update(transaction: TransactionEntity) = dao.updateTransaction(transaction)

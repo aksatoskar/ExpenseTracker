@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
@@ -81,6 +83,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -259,12 +262,35 @@ class ExpenseViewModel(app: ExpenseTrackerApp) : AndroidViewModel(app) {
         }
     }
 
-    fun saveReview(transaction: TransactionEntity, category: Category, priority: Priority, notes: String) {
-        viewModelScope.launch { repository.saveReview(transaction, category, priority, notes) }
+    fun saveReview(transaction: TransactionEntity, amountPaise: Long, category: Category, priority: Priority, notes: String) {
+        viewModelScope.launch { repository.saveReview(transaction, amountPaise, category, priority, notes) }
     }
 
     fun skip(transaction: TransactionEntity) {
         viewModelScope.launch { repository.skip(transaction) }
+    }
+
+    fun addManualTransaction(
+        amountRupees: String,
+        merchant: String,
+        category: Category,
+        priority: Priority,
+        notes: String,
+        timestamp: Long = System.currentTimeMillis()
+    ): Boolean {
+        val amount = amountRupees.toDoubleOrNull()?.takeIf { it > 0 } ?: return false
+        val trimmedMerchant = merchant.trim().ifBlank { return false }
+        viewModelScope.launch {
+            repository.addManualTransaction(
+                amountPaise = rupeesToPaise(amount),
+                merchant = trimmedMerchant,
+                category = category,
+                priority = priority,
+                notes = notes.trim(),
+                timestamp = timestamp
+            )
+        }
+        return true
     }
 
     fun delete(id: Long) {
@@ -372,12 +398,8 @@ fun ExpenseApp(startReviewId: Long?) {
                     transaction?.let {
                         ReviewDialog(
                             transaction = it,
-                            onSave = { category, priority, notes ->
-                                vm.saveReview(it, category, priority, notes)
-                                reviewId = null
-                            },
-                            onSkip = {
-                                vm.skip(it)
+                            onSave = { amountPaise, category, priority, notes ->
+                                vm.saveReview(it, amountPaise, category, priority, notes)
                                 reviewId = null
                             },
                             onDelete = {
@@ -543,9 +565,22 @@ fun OnboardingScreen(onDone: () -> Unit) {
 @Composable
 fun AppShell(vm: ExpenseViewModel, openReview: (Long) -> Unit, openBudget: (Category) -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
+    var showAddTransaction by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Txns", "Charts", "Budget", "Settings")
     val icons = listOf(Icons.Default.Dashboard, Icons.Default.ReceiptLong, Icons.Default.Analytics, Icons.Default.Payments, Icons.Default.Settings)
     Scaffold(
+        floatingActionButton = {
+            if (tab == 0) {
+                FloatingActionButton(
+                    onClick = { showAddTransaction = true },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add transaction")
+                }
+            }
+        },
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -586,6 +621,14 @@ fun AppShell(vm: ExpenseViewModel, openReview: (Long) -> Unit, openBudget: (Cate
                 else -> SettingsScreen(vm)
             }
         }
+    }
+    if (showAddTransaction) {
+        AddTransactionDialog(
+            onAdd = { amount, merchant, category, priority, notes ->
+                vm.addManualTransaction(amount, merchant, category, priority, notes)
+            },
+            onDismiss = { showAddTransaction = false }
+        )
     }
 }
 
@@ -1817,27 +1860,137 @@ private fun PermissionStatusCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun AddTransactionDialog(
+    onAdd: (String, String, Category, Priority, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var amount by remember { mutableStateOf("") }
+    var merchant by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf(Category.FoodDining) }
+    var priority by remember { mutableStateOf(Priority.Optional) }
+    var notes by remember { mutableStateOf("") }
+    var categoryOpen by remember { mutableStateOf(false) }
+    var priorityOpen by remember { mutableStateOf(false) }
+
+    val amountValue = amount.toDoubleOrNull()
+    val canSave = amountValue != null && amountValue > 0 && merchant.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Transaction") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Manually record a spend that wasn't captured automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { input ->
+                        val filtered = input.filter { it.isDigit() || it == '.' }
+                        if (filtered.count { it == '.' } <= 1) amount = filtered
+                    },
+                    label = { Text("Amount (₹)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = merchant,
+                    onValueChange = { merchant = it },
+                    label = { Text("Merchant / Description") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                ExposedDropdownMenuBox(expanded = categoryOpen, onExpandedChange = { categoryOpen = it }) {
+                    OutlinedTextField(
+                        readOnly = true,
+                        value = category.label,
+                        onValueChange = {},
+                        label = { Text("Category") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryOpen) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(expanded = categoryOpen, onDismissRequest = { categoryOpen = false }) {
+                        Category.entries.forEach { DropdownMenuItem(text = { Text(it.label) }, onClick = { category = it; categoryOpen = false }) }
+                    }
+                }
+                ExposedDropdownMenuBox(expanded = priorityOpen, onExpandedChange = { priorityOpen = it }) {
+                    OutlinedTextField(
+                        readOnly = true,
+                        value = priority.name,
+                        onValueChange = {},
+                        label = { Text("Priority") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = priorityOpen) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(expanded = priorityOpen, onDismissRequest = { priorityOpen = false }) {
+                        Priority.entries.forEach { DropdownMenuItem(text = { Text(it.name) }, onClick = { priority = it; priorityOpen = false }) }
+                    }
+                }
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes (optional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onAdd(amount, merchant, category, priority, notes)
+                    Toast.makeText(context, "Transaction added", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                },
+                enabled = canSave
+            ) { Text("Add") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun ReviewDialog(
     transaction: TransactionEntity,
-    onSave: (Category, Priority, String) -> Unit,
-    onSkip: () -> Unit,
+    onSave: (Long, Category, Priority, String) -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var category by remember(transaction.id) { mutableStateOf(transaction.category ?: Category.Other) }
     var priority by remember(transaction.id) { mutableStateOf(transaction.priority ?: Priority.Optional) }
     var notes by remember(transaction.id) { mutableStateOf(transaction.notes) }
+    var amount by remember(transaction.id) {
+        val p = transaction.amountPaise
+        mutableStateOf(if (p % 100L == 0L) (p / 100L).toString() else (p / 100.0).toString())
+    }
     var categoryOpen by remember { mutableStateOf(false) }
     var priorityOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    var confirmSkip by remember { mutableStateOf(false) }
+
+    val amountValue = amount.toDoubleOrNull()
+    val canSave = amountValue != null && amountValue > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Review Transaction") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Amount: ${formatInr(transaction.amountPaise)}")
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { input ->
+                        val filtered = input.filter { it.isDigit() || it == '.' }
+                        if (filtered.count { it == '.' } <= 1) amount = filtered
+                    },
+                    label = { Text("Amount (₹)") },
+                    singleLine = true,
+                    isError = !canSave,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Text("Merchant: ${transaction.merchant}")
                 Text("Date: ${dateText(transaction.timestamp)}")
                 Text("Source: ${transaction.source}")
@@ -1864,21 +2017,14 @@ fun ReviewDialog(
                 }
             }
         },
-        confirmButton = { Button(onClick = { onSave(category, priority, notes) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = { confirmSkip = true }) { Text("Skip") } }
+        confirmButton = {
+            Button(
+                onClick = { onSave(rupeesToPaise(amountValue ?: 0.0), category, priority, notes) },
+                enabled = canSave
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
-
-    if (confirmSkip) {
-        AlertDialog(
-            onDismissRequest = { confirmSkip = false },
-            title = { Text("Skip this transaction?") },
-            text = { Text("${formatInr(transaction.amountPaise)} at ${transaction.merchant} won't be added to your history, spending totals, or budgets. You can re-sync it later from Settings if needed.") },
-            confirmButton = {
-                Button(onClick = { confirmSkip = false; onSkip() }) { Text("Skip") }
-            },
-            dismissButton = { TextButton(onClick = { confirmSkip = false }) { Text("Cancel") } }
-        )
-    }
 
     if (confirmDelete) {
         AlertDialog(
