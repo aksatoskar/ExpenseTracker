@@ -1830,6 +1830,7 @@ fun ReviewDialog(
     var categoryOpen by remember { mutableStateOf(false) }
     var priorityOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmSkip by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1864,8 +1865,20 @@ fun ReviewDialog(
             }
         },
         confirmButton = { Button(onClick = { onSave(category, priority, notes) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onSkip) { Text("Skip") } }
+        dismissButton = { TextButton(onClick = { confirmSkip = true }) { Text("Skip") } }
     )
+
+    if (confirmSkip) {
+        AlertDialog(
+            onDismissRequest = { confirmSkip = false },
+            title = { Text("Skip this transaction?") },
+            text = { Text("${formatInr(transaction.amountPaise)} at ${transaction.merchant} won't be added to your history, spending totals, or budgets. You can re-sync it later from Settings if needed.") },
+            confirmButton = {
+                Button(onClick = { confirmSkip = false; onSkip() }) { Text("Skip") }
+            },
+            dismissButton = { TextButton(onClick = { confirmSkip = false }) { Text("Cancel") } }
+        )
+    }
 
     if (confirmDelete) {
         AlertDialog(

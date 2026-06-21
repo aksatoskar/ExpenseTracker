@@ -24,10 +24,10 @@ interface ExpenseDao {
     @Query("SELECT * FROM transactions WHERE id = :id")
     fun observeTransaction(id: Long): Flow<TransactionEntity?>
 
-    @Query("SELECT * FROM transactions ORDER BY timestamp DESC LIMIT 10")
+    @Query("SELECT * FROM transactions WHERE status = 'Reviewed' ORDER BY timestamp DESC LIMIT 10")
     fun observeLatestTransactions(): Flow<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
+    @Query("SELECT * FROM transactions WHERE status = 'Reviewed' ORDER BY timestamp DESC")
     fun observeAllTransactions(): Flow<List<TransactionEntity>>
 
     @Query("SELECT * FROM transactions WHERE status = 'PendingReview' ORDER BY timestamp DESC")
@@ -39,19 +39,19 @@ interface ExpenseDao {
     @Query("SELECT COUNT(*) FROM transactions WHERE status = 'PendingReview'")
     fun observePendingCount(): Flow<Int>
 
-    @Query("SELECT COALESCE(SUM(amountPaise), 0) FROM transactions WHERE type = 'Debit' AND timestamp BETWEEN :start AND :end")
+    @Query("SELECT COALESCE(SUM(amountPaise), 0) FROM transactions WHERE type = 'Debit' AND status = 'Reviewed' AND timestamp BETWEEN :start AND :end")
     fun observeDebitTotal(start: Long, end: Long): Flow<Long>
 
-    @Query("SELECT category, COALESCE(SUM(amountPaise), 0) AS amountPaise FROM transactions WHERE type = 'Debit' AND timestamp BETWEEN :start AND :end GROUP BY category ORDER BY amountPaise DESC")
+    @Query("SELECT category, COALESCE(SUM(amountPaise), 0) AS amountPaise FROM transactions WHERE type = 'Debit' AND status = 'Reviewed' AND timestamp BETWEEN :start AND :end GROUP BY category ORDER BY amountPaise DESC")
     fun observeCategoryTotals(start: Long, end: Long): Flow<List<AmountByCategory>>
 
-    @Query("SELECT priority, COALESCE(SUM(amountPaise), 0) AS amountPaise FROM transactions WHERE type = 'Debit' AND timestamp BETWEEN :start AND :end GROUP BY priority")
+    @Query("SELECT priority, COALESCE(SUM(amountPaise), 0) AS amountPaise FROM transactions WHERE type = 'Debit' AND status = 'Reviewed' AND timestamp BETWEEN :start AND :end GROUP BY priority")
     fun observePriorityTotals(start: Long, end: Long): Flow<List<AmountByPriority>>
 
-    @Query("SELECT merchant, COALESCE(SUM(amountPaise), 0) AS amountPaise FROM transactions WHERE type = 'Debit' AND timestamp BETWEEN :start AND :end GROUP BY merchant ORDER BY amountPaise DESC LIMIT :limit")
+    @Query("SELECT merchant, COALESCE(SUM(amountPaise), 0) AS amountPaise FROM transactions WHERE type = 'Debit' AND status = 'Reviewed' AND timestamp BETWEEN :start AND :end GROUP BY merchant ORDER BY amountPaise DESC LIMIT :limit")
     fun observeTopMerchants(start: Long, end: Long, limit: Int): Flow<List<AmountByMerchant>>
 
-    @Query("SELECT * FROM transactions WHERE type = 'Debit' AND timestamp BETWEEN :start AND :end")
+    @Query("SELECT * FROM transactions WHERE type = 'Debit' AND status = 'Reviewed' AND timestamp BETWEEN :start AND :end")
     suspend fun getDebitTransactions(start: Long, end: Long): List<TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE amountPaise = :amountPaise AND type = :type AND timestamp BETWEEN :start AND :end")
@@ -68,7 +68,7 @@ interface ExpenseDao {
     @Query("SELECT * FROM budgets WHERE category = :category LIMIT 1")
     suspend fun getBudget(category: Category): BudgetEntity?
 
-    @Query("SELECT COALESCE(SUM(amountPaise), 0) FROM transactions WHERE type = 'Debit' AND category = :category AND timestamp BETWEEN :start AND :end")
+    @Query("SELECT COALESCE(SUM(amountPaise), 0) FROM transactions WHERE type = 'Debit' AND status = 'Reviewed' AND category = :category AND timestamp BETWEEN :start AND :end")
     suspend fun getCategorySpent(category: Category, start: Long, end: Long): Long
 
     @Query("SELECT * FROM merchant_rules WHERE merchantKey = :merchantKey LIMIT 1")
