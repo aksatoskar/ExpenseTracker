@@ -1,18 +1,19 @@
-package com.example.expensetracker.domain
+package com.example.expensetracker.domain.parser
 
-import com.example.expensetracker.data.TransactionType
+import com.example.expensetracker.core.money.rupeesToPaise
+import com.example.expensetracker.domain.model.ParsedTransaction
+import com.example.expensetracker.domain.model.TransactionType
 import java.util.Locale
+import javax.inject.Inject
 
-data class ParsedTransaction(
-    val amountPaise: Long,
-    val merchant: String,
-    val type: TransactionType,
-    val timestamp: Long,
-    val source: String,
-    val rawText: String
-)
-
-class TransactionParser {
+/**
+ * Extracts a [ParsedTransaction] from free-form SMS or notification text.
+ *
+ * Only debit-style messages that contain a recognizable amount and merchant are returned;
+ * everything else (credits, OTPs, promos) yields `null`. The parser is pure and stateless,
+ * which makes it trivially unit-testable.
+ */
+class TransactionParser @Inject constructor() {
     private val amountRegex = Regex(
         "(?:INR|Rs\\.?|₹)\\s*([0-9,]+(?:\\.\\d{1,2})?)|([0-9,]+(?:\\.\\d{1,2})?)\\s*(?:INR|Rs\\.?|₹)",
         RegexOption.IGNORE_CASE

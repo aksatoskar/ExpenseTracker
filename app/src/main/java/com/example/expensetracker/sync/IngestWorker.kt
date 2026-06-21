@@ -1,24 +1,33 @@
 package com.example.expensetracker.sync
 
 import android.content.Context
+import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
+import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import androidx.work.CoroutineWorker
-import com.example.expensetracker.ExpenseTrackerApp
-import com.example.expensetracker.data.TransactionType
-import com.example.expensetracker.domain.ParsedTransaction
+import com.example.expensetracker.domain.model.ParsedTransaction
+import com.example.expensetracker.domain.model.TransactionType
+import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
-class IngestWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+/** Reliable fallback that ingests a parsed transaction off the main thread, retrying on failure. */
+@HiltWorker
+class IngestWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val ingestTransaction: IngestTransactionUseCase
+) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         val parsed = inputData.toParsedTransaction() ?: return Result.failure()
         return try {
-            (applicationContext as ExpenseTrackerApp).repository.ingest(parsed)
+            ingestTransaction(parsed)
             Result.success()
         } catch (e: Exception) {
             Result.retry()

@@ -1,4 +1,4 @@
-package com.example.expensetracker.notifications
+package com.example.expensetracker.data.notification
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,13 +10,25 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.expensetracker.MainActivity
 import com.example.expensetracker.R
-import com.example.expensetracker.data.Category
-import com.example.expensetracker.data.TransactionEntity
-import com.example.expensetracker.domain.formatInr
+import com.example.expensetracker.core.money.formatInr
+import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.notification.Notifier
+import com.example.expensetracker.notifications.NotificationActionReceiver
 import com.example.expensetracker.util.PermissionHelper
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class ExpenseNotifications(private val context: Context) {
-    fun createChannels() {
+/**
+ * Android implementation of [Notifier] built on [NotificationCompat]. Owns channel creation and
+ * the mapping from transaction ids to stable notification ids.
+ */
+@Singleton
+class AndroidNotifier @Inject constructor(
+    @ApplicationContext private val context: Context
+) : Notifier {
+
+    override fun createChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
@@ -39,8 +51,10 @@ class ExpenseNotifications(private val context: Context) {
         )
     }
 
-    fun showDetected(transactionId: Long, transaction: TransactionEntity): Boolean {
-        if (!PermissionHelper.areNotificationsEnabled(context)) return false
+    override fun areNotificationsEnabled(): Boolean = PermissionHelper.areNotificationsEnabled(context)
+
+    override fun showDetected(transactionId: Long, amountPaise: Long, merchant: String, source: String): Boolean {
+        if (!areNotificationsEnabled()) return false
 
         val reviewIntent = MainActivity.intent(context, reviewTransactionId = transactionId)
         val remindIntent = Intent(context, NotificationActionReceiver::class.java)
@@ -51,10 +65,10 @@ class ExpenseNotifications(private val context: Context) {
         val notification = NotificationCompat.Builder(context, DETECTED_CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("New Expense Detected")
-            .setContentText("${formatInr(transaction.amountPaise)} spent at ${transaction.merchant}")
+            .setContentText("${formatInr(amountPaise)} spent at $merchant")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("${formatInr(transaction.amountPaise)} spent at ${transaction.merchant} via ${transaction.source}")
+                    .bigText("${formatInr(amountPaise)} spent at $merchant via $source")
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -68,8 +82,8 @@ class ExpenseNotifications(private val context: Context) {
         return true
     }
 
-    fun showReminder(transactionId: Long, title: String, body: String): Boolean {
-        if (!PermissionHelper.areNotificationsEnabled(context)) return false
+    override fun showReminder(transactionId: Long, title: String, body: String): Boolean {
+        if (!areNotificationsEnabled()) return false
         val notificationId = notificationIdFor(transactionId) + REMINDER_ID_OFFSET
         val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
@@ -82,8 +96,8 @@ class ExpenseNotifications(private val context: Context) {
         return true
     }
 
-    fun showTest(): Boolean {
-        if (!PermissionHelper.areNotificationsEnabled(context)) return false
+    override fun showTest(): Boolean {
+        if (!areNotificationsEnabled()) return false
         val notification = NotificationCompat.Builder(context, DETECTED_CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Notifications are working")
@@ -96,8 +110,8 @@ class ExpenseNotifications(private val context: Context) {
         return true
     }
 
-    fun showBudgetAlert(category: Category, thresholdPercent: Int, spentPaise: Long, limitPaise: Long): Boolean {
-        if (!PermissionHelper.areNotificationsEnabled(context)) return false
+    override fun showBudgetAlert(category: Category, thresholdPercent: Int, spentPaise: Long, limitPaise: Long): Boolean {
+        if (!areNotificationsEnabled()) return false
         val title = if (thresholdPercent >= 100) {
             "Budget exceeded: ${category.label}"
         } else {
@@ -118,8 +132,8 @@ class ExpenseNotifications(private val context: Context) {
         return true
     }
 
-    fun showReport(title: String, body: String): Boolean {
-        if (!PermissionHelper.areNotificationsEnabled(context)) return false
+    override fun showReport(title: String, body: String): Boolean {
+        if (!areNotificationsEnabled()) return false
         val notification = NotificationCompat.Builder(context, REPORT_CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -132,7 +146,7 @@ class ExpenseNotifications(private val context: Context) {
         return true
     }
 
-    fun cancel(transactionId: Long) {
+    override fun cancel(transactionId: Long) {
         val manager = NotificationManagerCompat.from(context)
         val baseId = notificationIdFor(transactionId)
         manager.cancel(baseId)
@@ -142,8 +156,7 @@ class ExpenseNotifications(private val context: Context) {
     private fun notificationIdFor(transactionId: Long): Int =
         (transactionId xor (transactionId shr 32)).toInt() and 0x7FFFFFFF
 
-    private fun flags() =
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    private fun flags() = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
     companion object {
         const val DETECTED_CHANNEL = "expense_detected"

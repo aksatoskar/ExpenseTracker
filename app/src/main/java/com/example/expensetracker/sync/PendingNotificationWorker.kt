@@ -1,18 +1,27 @@
 package com.example.expensetracker.sync
 
 import android.content.Context
+import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.example.expensetracker.ExpenseTrackerApp
+import com.example.expensetracker.domain.usecase.transaction.NotifyPendingUseCase
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 
-class PendingNotificationWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+/** Re-notifies any pending transactions that were never surfaced (missed-notification recovery). */
+@HiltWorker
+class PendingNotificationWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val notifyPending: NotifyPendingUseCase
+) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
-            (applicationContext as ExpenseTrackerApp).repository.notifyPendingUnnotified()
+            notifyPending()
             Result.success()
         } catch (e: Exception) {
             Result.retry()

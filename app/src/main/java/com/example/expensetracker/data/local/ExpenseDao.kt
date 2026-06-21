@@ -1,12 +1,26 @@
-package com.example.expensetracker.data
+package com.example.expensetracker.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.example.expensetracker.data.local.entity.BudgetEntity
+import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.MerchantRuleEntity
+import com.example.expensetracker.data.local.entity.MonthlyReportEntity
+import com.example.expensetracker.data.local.entity.TransactionEntity
+import com.example.expensetracker.domain.model.AmountByCategory
+import com.example.expensetracker.domain.model.AmountByMerchant
+import com.example.expensetracker.domain.model.AmountByPriority
+import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.TransactionType
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Room data-access object. All display/analytics queries are scoped to `status = 'Reviewed'` so
+ * only user-confirmed transactions feed totals, budgets and history.
+ */
 @Dao
 interface ExpenseDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)

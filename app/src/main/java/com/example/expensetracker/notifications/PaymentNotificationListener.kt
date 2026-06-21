@@ -2,19 +2,29 @@ package com.example.expensetracker.notifications
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import com.example.expensetracker.ExpenseTrackerApp
-import com.example.expensetracker.domain.NotificationTextExtractor
-import com.example.expensetracker.domain.TransactionParser
+import com.example.expensetracker.domain.parser.NotificationTextExtractor
+import com.example.expensetracker.domain.parser.TransactionParser
+import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
 import com.example.expensetracker.sync.IngestWorker
 import com.example.expensetracker.sync.PendingNotificationWorker
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+/**
+ * Listens to other apps' payment notifications (UPI/banking), parses debits and ingests them.
+ * On reconnect it also triggers missed-notification recovery.
+ */
+@AndroidEntryPoint
 class PaymentNotificationListener : NotificationListenerService() {
+
+    @Inject lateinit var ingestTransaction: IngestTransactionUseCase
+    @Inject lateinit var parser: TransactionParser
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val parser = TransactionParser()
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -31,7 +41,7 @@ class PaymentNotificationListener : NotificationListenerService() {
         val appContext = applicationContext
         scope.launch {
             try {
-                (appContext as ExpenseTrackerApp).repository.ingest(parsed)
+                ingestTransaction(parsed)
             } catch (e: Exception) {
                 IngestWorker.enqueue(appContext, parsed)
             }

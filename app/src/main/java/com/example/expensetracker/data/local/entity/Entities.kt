@@ -1,25 +1,17 @@
-package com.example.expensetracker.data
+package com.example.expensetracker.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.Priority
+import com.example.expensetracker.domain.model.TransactionStatus
+import com.example.expensetracker.domain.model.TransactionType
 
-enum class TransactionType { Debit, Credit }
-enum class TransactionStatus { PendingReview, Reviewed, Skipped }
-enum class Category(val label: String) {
-    FoodDining("Food & Dining"),
-    Shopping("Shopping"),
-    Travel("Travel"),
-    BillsUtilities("Bills & Utilities"),
-    RentHome("Rent/Home"),
-    Health("Health"),
-    Education("Education"),
-    Investments("Investments"),
-    Entertainment("Entertainment"),
-    Other("Other")
-}
-enum class Priority { Essential, Optional, Wasteful }
-
+/**
+ * A single detected or manually-added transaction. Amounts are stored in paise.
+ * Reused as the shared model across layers in this pragmatic single-module architecture.
+ */
 @Entity(
     tableName = "transactions",
     indices = [Index("timestamp"), Index("merchant"), Index("status"), Index("category")]
@@ -39,6 +31,7 @@ data class TransactionEntity(
     val notified: Boolean = false
 )
 
+/** Learned mapping from a normalized merchant key to its category/priority, for auto-fill. */
 @Entity(tableName = "merchant_rules", indices = [Index(value = ["merchantKey"], unique = true)])
 data class MerchantRuleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -49,6 +42,7 @@ data class MerchantRuleEntity(
     val updatedAt: Long
 )
 
+/** A monthly spending limit for a [category]; alert flags track which thresholds were notified. */
 @Entity(tableName = "budgets", indices = [Index(value = ["category"], unique = true)])
 data class BudgetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -60,6 +54,7 @@ data class BudgetEntity(
     val alert100Sent: Boolean = false
 )
 
+/** Archived snapshot of a budget vs. actual spend for a past month. */
 @Entity(tableName = "budget_history", indices = [Index(value = ["yearMonth", "category"], unique = true)])
 data class BudgetHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -70,6 +65,7 @@ data class BudgetHistoryEntity(
     val createdAt: Long
 )
 
+/** Generated end-of-month report summary. */
 @Entity(tableName = "monthly_reports", indices = [Index(value = ["yearMonth"], unique = true)])
 data class MonthlyReportEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -82,7 +78,3 @@ data class MonthlyReportEntity(
     val savingsEstimatePaise: Long,
     val generatedAt: Long
 )
-
-data class AmountByCategory(val category: Category?, val amountPaise: Long)
-data class AmountByPriority(val priority: Priority?, val amountPaise: Long)
-data class AmountByMerchant(val merchant: String, val amountPaise: Long)

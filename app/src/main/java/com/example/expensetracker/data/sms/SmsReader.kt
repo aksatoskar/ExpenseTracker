@@ -1,12 +1,16 @@
-package com.example.expensetracker.data
+package com.example.expensetracker.data.sms
 
 import android.content.Context
 import android.provider.Telephony
+import com.example.expensetracker.domain.model.RawSms
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 
-data class RawSms(val body: String, val timestamp: Long)
-
-class SmsReader(private val context: Context) {
-
+/** Reads bank/payment SMS bodies from the system inbox via [Telephony]. */
+class SmsReader @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    /** Returns up to [limit] inbox messages newer than [sinceMillis], oldest first. */
     fun readSince(sinceMillis: Long, limit: Int = 500): List<RawSms> {
         val results = mutableListOf<RawSms>()
         val projection = arrayOf(Telephony.Sms.BODY, Telephony.Sms.DATE)

@@ -1,7 +1,12 @@
-package com.example.expensetracker.domain
+package com.example.expensetracker.domain.parser
 
 import android.os.Bundle
 
+/**
+ * Flattens the relevant text fields of a notification's [Bundle] extras into a single string
+ * suitable for [TransactionParser]. Covers standard title/text keys, messaging-style payloads,
+ * inbox text lines and any custom CharSequence extras.
+ */
 object NotificationTextExtractor {
 
     private val textKeys = listOf(
@@ -36,8 +41,7 @@ object NotificationTextExtractor {
 
         extras.keySet().forEach { key ->
             if (key.startsWith("android.") || key.startsWith("androidx.")) return@forEach
-            val value = extras.get(key)
-            when (value) {
+            when (val value = extras.get(key)) {
                 is CharSequence -> value.toString().takeIf { it.isNotBlank() }?.let { parts.add(it) }
                 is Array<*> -> value.filterIsInstance<CharSequence>().forEach { parts.add(it.toString()) }
             }

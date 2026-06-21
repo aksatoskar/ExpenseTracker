@@ -1,14 +1,22 @@
-package com.example.expensetracker.data
+package com.example.expensetracker.data.local
 
-import android.content.Context
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.expensetracker.data.local.entity.BudgetEntity
+import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.MerchantRuleEntity
+import com.example.expensetracker.data.local.entity.MonthlyReportEntity
+import com.example.expensetracker.data.local.entity.TransactionEntity
+import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.Priority
+import com.example.expensetracker.domain.model.TransactionStatus
+import com.example.expensetracker.domain.model.TransactionType
 
+/** Stores the app's enums as their stable `name` strings. */
 class ExpenseConverters {
     @TypeConverter fun transactionTypeToString(value: TransactionType?) = value?.name
     @TypeConverter fun stringToTransactionType(value: String?) = value?.let(TransactionType::valueOf)
@@ -36,9 +44,9 @@ abstract class ExpenseDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
 
     companion object {
-        @Volatile private var instance: ExpenseDatabase? = null
+        const val NAME = "expense_tracker.db"
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `budget_history` (" +
@@ -55,18 +63,5 @@ abstract class ExpenseDatabase : RoomDatabase() {
                 )
             }
         }
-
-        fun get(context: Context): ExpenseDatabase =
-            instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    ExpenseDatabase::class.java,
-                    "expense_tracker.db"
-                )
-                    .addMigrations(MIGRATION_1_2)
-                    .fallbackToDestructiveMigration()
-                    .build()
-                    .also { instance = it }
-            }
     }
 }

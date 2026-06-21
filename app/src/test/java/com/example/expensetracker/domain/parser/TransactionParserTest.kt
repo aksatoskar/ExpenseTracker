@@ -1,6 +1,6 @@
-package com.example.expensetracker.domain
+package com.example.expensetracker.domain.parser
 
-import com.example.expensetracker.data.TransactionType
+import com.example.expensetracker.domain.model.TransactionType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
