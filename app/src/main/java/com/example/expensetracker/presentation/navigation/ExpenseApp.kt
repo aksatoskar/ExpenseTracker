@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +22,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -70,11 +72,30 @@ fun ExpenseApp(startReviewId: Long?) {
                 !state.onboardingComplete -> OnboardingScreen(onDone = appVm::completeOnboarding)
                 else -> {
                     LaunchedEffect(Unit) { appVm.runStartupTasks() }
+                    val showSyncPrompt by appVm.showSyncPrompt.collectAsState()
                     AppShell(
                         openReview = { reviewId = it },
                         openBudget = { budgetCategory = it },
                         logScreen = appVm::logScreen
                     )
+                    if (showSyncPrompt) {
+                        AlertDialog(
+                            onDismissRequest = { appVm.resolveSyncPrompt(sync = false) },
+                            title = { Text("Sync your data?") },
+                            text = {
+                                Text(
+                                    "Back up your transactions, budgets and reports to your Google account. " +
+                                        "You can sync any time from Settings."
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { appVm.resolveSyncPrompt(sync = true) }) { Text("Sync now") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { appVm.resolveSyncPrompt(sync = false) }) { Text("Not now") }
+                            }
+                        )
+                    }
                     budgetCategory?.let { cat ->
                         BudgetDetailScreen(
                             category = cat,

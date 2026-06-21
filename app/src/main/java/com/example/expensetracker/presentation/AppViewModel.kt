@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.expensetracker.domain.analytics.AnalyticsEvent
 import com.example.expensetracker.domain.analytics.AnalyticsTracker
+import com.example.expensetracker.domain.auth.AuthRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.usecase.budget.RenewBudgetsUseCase
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
+import com.example.expensetracker.domain.usecase.sync.SyncDataUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +33,9 @@ class AppViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val syncSmsInbox: SyncSmsInboxUseCase,
     private val renewBudgets: RenewBudgetsUseCase,
-    private val analytics: AnalyticsTracker
+    private val analytics: AnalyticsTracker,
+    private val authRepository: AuthRepository,
+    private val syncData: SyncDataUseCase
 ) : ViewModel() {
 
     val uiState: StateFlow<AppUiState> = combine(
@@ -41,10 +45,25 @@ class AppViewModel @Inject constructor(
         AppUiState(loaded = true, onboardingComplete = onboarded, darkTheme = dark)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppUiState())
 
+    /** True only while a signed-in user has not yet been shown the one-time post-login sync prompt. */
+    val showSyncPrompt: StateFlow<Boolean> = combine(
+        authRepository.currentUser,
+        settingsRepository.syncPromptShown
+    ) { user, shown -> user != null && !shown }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     private var startupTriggered = false
 
     fun completeOnboarding() {
         viewModelScope.launch { settingsRepository.setOnboardingComplete(true) }
+    }
+
+    /** Dismisses the one-time sync prompt; when [sync] is true, also runs a cloud sync. */
+    fun resolveSyncPrompt(sync: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setSyncPromptShown(true)
+            if (sync) runCatching { syncData() }
+        }
     }
 
     /** Reports a bottom-nav screen view to analytics. */

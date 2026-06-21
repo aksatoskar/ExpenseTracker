@@ -14,7 +14,10 @@ import com.example.expensetracker.domain.model.TransactionType
  */
 @Entity(
     tableName = "transactions",
-    indices = [Index("timestamp"), Index("merchant"), Index("status"), Index("category")]
+    indices = [
+        Index("timestamp"), Index("merchant"), Index("status"), Index("category"),
+        Index(value = ["syncId"], unique = true)
+    ]
 )
 data class TransactionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -28,7 +31,9 @@ data class TransactionEntity(
     val category: Category? = null,
     val priority: Priority? = null,
     val notes: String = "",
-    val notified: Boolean = false
+    val notified: Boolean = false,
+    /** Stable cross-device identity for cloud sync; null until first synced. */
+    val syncId: String? = null
 )
 
 /** Learned mapping from a normalized merchant key to its category/priority, for auto-fill. */

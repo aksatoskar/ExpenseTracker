@@ -1,5 +1,6 @@
 package com.example.expensetracker.presentation.settings
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -19,15 +20,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -46,6 +52,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.expensetracker.presentation.common.PermissionStatusCard
 import com.example.expensetracker.presentation.common.SectionHeader
+import com.example.expensetracker.presentation.common.syncTimeText
 import com.example.expensetracker.util.PermissionHelper
 
 /** Settings tab: theme toggle, detection-reliability permission status and privacy info. */
@@ -54,6 +61,9 @@ fun SettingsScreen() {
     val context = LocalContext.current
     val vm: SettingsViewModel = hiltViewModel()
     val darkTheme by vm.darkTheme.collectAsState()
+    val currentUser by vm.currentUser.collectAsState()
+    val lastCloudSync by vm.lastCloudSync.collectAsState()
+    val isCloudSyncing by vm.isCloudSyncing.collectAsState()
     var refreshKey by remember { mutableIntStateOf(0) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -101,6 +111,87 @@ fun SettingsScreen() {
                         )
                     }
                     Switch(checked = darkTheme, onCheckedChange = vm::setDarkTheme)
+                }
+            }
+        }
+        item { SectionHeader("Account & Sync") }
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (currentUser != null) Icons.Default.CloudDone else Icons.Default.CloudSync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            val user = currentUser
+                            if (user != null) {
+                                Text(user.displayName ?: "Signed in", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    user.email ?: "Google account",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text("Back up & sync", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "Sign in with Google to sync your data across devices",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    if (currentUser == null) {
+                        Button(
+                            onClick = {
+                                (context as? Activity)?.let { activity ->
+                                    vm.signIn(activity) { msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Sign in with Google") }
+                    } else {
+                        Text(
+                            "Last synced: ${syncTimeText(lastCloudSync)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = {
+                                vm.cloudSyncNow { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() }
+                            },
+                            enabled = !isCloudSyncing,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (isCloudSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Syncing...")
+                            } else {
+                                Text("Sync now")
+                            }
+                        }
+                        TextButton(
+                            onClick = { vm.signOut() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Sign out") }
+                    }
                 }
             }
         }
@@ -176,7 +267,7 @@ fun SettingsScreen() {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Privacy-first architecture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "All transaction processing, merchant learning, analytics, budgets, and reports run locally on this device.",
+                        "All transaction processing, merchant learning, budgets, and reports run locally on this device. Your data is only uploaded to your private Firebase account when you sign in and sync.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

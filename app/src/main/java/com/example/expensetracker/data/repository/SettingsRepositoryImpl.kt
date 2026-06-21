@@ -53,6 +53,12 @@ class SettingsRepositoryImpl @Inject constructor(
     override val lastBudgetArchiveMonth: Flow<String?> =
         store.data.map { it[KEY_LAST_ARCHIVE] }
 
+    override val lastCloudSync: Flow<Long> =
+        store.data.map { it[KEY_LAST_CLOUD_SYNC] ?: 0L }
+
+    override val syncPromptShown: Flow<Boolean> =
+        store.data.map { it[KEY_SYNC_PROMPT_SHOWN] ?: false }
+
     override suspend fun setOnboardingComplete(complete: Boolean) {
         store.edit { it[KEY_ONBOARDING] = complete }
     }
@@ -69,10 +75,20 @@ class SettingsRepositoryImpl @Inject constructor(
         store.edit { it[KEY_LAST_ARCHIVE] = yearMonth }
     }
 
+    override suspend fun setLastCloudSync(millis: Long) {
+        store.edit { it[KEY_LAST_CLOUD_SYNC] = millis }
+    }
+
+    override suspend fun setSyncPromptShown(shown: Boolean) {
+        store.edit { it[KEY_SYNC_PROMPT_SHOWN] = shown }
+    }
+
     private companion object {
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_complete")
         val KEY_DARK_THEME = booleanPreferencesKey("dark_theme")
         val KEY_LAST_SYNC = longPreferencesKey("last_sms_sync")
         val KEY_LAST_ARCHIVE = stringPreferencesKey("last_budget_archive_month")
+        val KEY_LAST_CLOUD_SYNC = longPreferencesKey("last_cloud_sync")
+        val KEY_SYNC_PROMPT_SHOWN = booleanPreferencesKey("sync_prompt_shown")
     }
 }

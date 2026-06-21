@@ -35,6 +35,15 @@ interface ExpenseDao {
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun getTransaction(id: Long): TransactionEntity?
 
+    @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
+    suspend fun getAllTransactions(): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions WHERE syncId = :syncId LIMIT 1")
+    suspend fun getTransactionBySyncId(syncId: String): TransactionEntity?
+
+    @Query("UPDATE transactions SET syncId = :syncId WHERE id = :id")
+    suspend fun setTransactionSyncId(id: Long, syncId: String)
+
     @Query("SELECT * FROM transactions WHERE id = :id")
     fun observeTransaction(id: Long): Flow<TransactionEntity?>
 
@@ -88,6 +97,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM merchant_rules WHERE merchantKey = :merchantKey LIMIT 1")
     suspend fun getMerchantRule(merchantKey: String): MerchantRuleEntity?
 
+    @Query("SELECT * FROM merchant_rules")
+    suspend fun getAllMerchantRules(): List<MerchantRuleEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMerchantRule(rule: MerchantRuleEntity)
 
@@ -114,6 +126,12 @@ interface ExpenseDao {
 
     @Query("SELECT * FROM budget_history ORDER BY yearMonth DESC, category ASC")
     fun observeBudgetHistory(): Flow<List<BudgetHistoryEntity>>
+
+    @Query("SELECT * FROM budget_history")
+    suspend fun getAllBudgetHistory(): List<BudgetHistoryEntity>
+
+    @Query("SELECT * FROM monthly_reports")
+    suspend fun getAllReports(): List<MonthlyReportEntity>
 
     @Query("SELECT COUNT(*) FROM budget_history WHERE yearMonth = :yearMonth")
     suspend fun budgetHistoryCount(yearMonth: String): Int

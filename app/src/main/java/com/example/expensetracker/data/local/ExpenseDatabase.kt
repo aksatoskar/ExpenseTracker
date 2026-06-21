@@ -36,7 +36,7 @@ class ExpenseConverters {
         MonthlyReportEntity::class,
         BudgetHistoryEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(ExpenseConverters::class)
@@ -60,6 +60,16 @@ abstract class ExpenseDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS `index_budget_history_yearMonth_category` " +
                         "ON `budget_history` (`yearMonth`, `category`)"
+                )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `syncId` TEXT")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_transactions_syncId` " +
+                        "ON `transactions` (`syncId`)"
                 )
             }
         }
