@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +36,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CheckCircle
@@ -131,6 +133,7 @@ import com.example.expensetracker.data.ExpenseRepository
 import com.example.expensetracker.data.Priority
 import com.example.expensetracker.data.TransactionEntity
 import com.example.expensetracker.data.TransactionStatus
+import com.example.expensetracker.data.TransactionType
 import com.example.expensetracker.domain.formatInr
 import com.example.expensetracker.domain.rupeesToPaise
 import com.example.expensetracker.notifications.ExpenseNotifications
@@ -339,6 +342,7 @@ fun ExpenseApp(startReviewId: Long?) {
         }
     )
     var reviewId by remember { mutableStateOf(startReviewId) }
+    var budgetCategory by remember { mutableStateOf<Category?>(null) }
     val onboardingComplete by vm.onboardingComplete
     val darkTheme by vm.darkTheme
 
@@ -354,7 +358,15 @@ fun ExpenseApp(startReviewId: Long?) {
                     vm.syncSms()
                     vm.renewBudgetsIfNeeded()
                 }
-                AppShell(vm, openReview = { reviewId = it })
+                AppShell(vm, openReview = { reviewId = it }, openBudget = { budgetCategory = it })
+                budgetCategory?.let { cat ->
+                    BudgetDetailScreen(
+                        vm = vm,
+                        category = cat,
+                        onBack = { budgetCategory = null },
+                        openReview = { reviewId = it }
+                    )
+                }
                 reviewId?.let { id ->
                     val transaction by vm.observeTransaction(id).collectAsState(initial = null)
                     transaction?.let {
@@ -529,7 +541,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
 }
 
 @Composable
-fun AppShell(vm: ExpenseViewModel, openReview: (Long) -> Unit) {
+fun AppShell(vm: ExpenseViewModel, openReview: (Long) -> Unit, openBudget: (Category) -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Home", "Txns", "Charts", "Budget", "Settings")
     val icons = listOf(Icons.Default.Dashboard, Icons.Default.ReceiptLong, Icons.Default.Analytics, Icons.Default.Payments, Icons.Default.Settings)
@@ -570,7 +582,7 @@ fun AppShell(vm: ExpenseViewModel, openReview: (Long) -> Unit) {
                 0 -> DashboardScreen(vm, openReview)
                 1 -> TransactionsScreen(vm, openReview)
                 2 -> AnalyticsScreen(vm)
-                3 -> BudgetScreen(vm)
+                3 -> BudgetScreen(vm, openBudget)
                 else -> SettingsScreen(vm)
             }
         }
@@ -1294,7 +1306,7 @@ fun SimpleTrend(total: Long) {
 }
 
 @Composable
-fun BudgetScreen(vm: ExpenseViewModel) {
+fun BudgetScreen(vm: ExpenseViewModel, openBudget: (Category) -> Unit) {
     var view by remember { mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Budgets", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -1309,7 +1321,7 @@ fun BudgetScreen(vm: ExpenseViewModel) {
         }
         Spacer(Modifier.height(14.dp))
         when (view) {
-            0 -> BudgetManageView(vm)
+            0 -> BudgetManageView(vm, openBudget)
             else -> BudgetSummaryView(vm)
         }
     }
@@ -1317,7 +1329,7 @@ fun BudgetScreen(vm: ExpenseViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BudgetManageView(vm: ExpenseViewModel) {
+fun BudgetManageView(vm: ExpenseViewModel, onBudgetClick: (Category) -> Unit) {
     val budgets by vm.budgets.collectAsState()
     val dashboard by vm.dashboard.collectAsState()
     var category by remember { mutableStateOf(Category.FoodDining) }
@@ -1388,7 +1400,7 @@ fun BudgetManageView(vm: ExpenseViewModel) {
             val accent = categoryColor(budget.category)
             val barColor = if (overBudget) MaterialTheme.colorScheme.error else accent
             Card(
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().clickable { onBudgetClick(budget.category) },
                 shape = RoundedCornerShape(14.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
@@ -1428,6 +1440,104 @@ fun BudgetManageView(vm: ExpenseViewModel) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun BudgetDetailScreen(
+    vm: ExpenseViewModel,
+    category: Category,
+    onBack: () -> Unit,
+    openReview: (Long) -> Unit
+) {
+    BackHandler(onBack = onBack)
+    val all by vm.all.collectAsState()
+    val budgets by vm.budgets.collectAsState()
+    val range = remember { DateRange.month() }
+    val transactions = remember(all, category, range) {
+        all.filter {
+            it.type == TransactionType.Debit &&
+                it.category == category &&
+                it.timestamp in range.startMillis..range.endMillis
+        }
+    }
+    val spent = remember(transactions) { transactions.sumOf { it.amountPaise } }
+    val budget = budgets.firstOrNull { it.category == category }
+    val accent = categoryColor(category)
+
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Text(category.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+            item {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.65f))))
+                        .padding(20.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                categoryIcon(category),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Spent this month",
+                                color = Color.White.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            formatInr(spent),
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        budget?.let { b ->
+                            val pct = (spent * 100 / b.limitPaise.coerceAtLeast(1)).toInt()
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "$pct% of ${formatInr(b.limitPaise)} budget",
+                                color = Color.White.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                Text(
+                    "${transactions.size} ${if (transactions.size == 1) "transaction" else "transactions"}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            if (transactions.isEmpty()) {
+                item {
+                    Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "No transactions in this budget yet this month.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+            items(transactions) { TransactionRow(it, onClick = { openReview(it.id) }) }
         }
     }
 }
