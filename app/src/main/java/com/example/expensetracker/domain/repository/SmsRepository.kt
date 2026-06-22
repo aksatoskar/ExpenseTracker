@@ -9,7 +9,4 @@ interface SmsRepository {
 
     /** Returns inbox messages newer than [sinceMillis]. */
     fun readSince(sinceMillis: Long): List<RawSms>
-
-    /** Epoch millis when the app was first installed, used as the earliest sync boundary. */
-    fun appInstallTimeMillis(): Long
 }

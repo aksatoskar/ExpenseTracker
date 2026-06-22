@@ -8,6 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.MonthlyReportEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
@@ -34,9 +35,10 @@ class ExpenseConverters {
         MerchantRuleEntity::class,
         BudgetEntity::class,
         MonthlyReportEntity::class,
-        BudgetHistoryEntity::class
+        BudgetHistoryEntity::class,
+        DeletedTransactionEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(ExpenseConverters::class)
@@ -70,6 +72,17 @@ abstract class ExpenseDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS `index_transactions_syncId` " +
                         "ON `transactions` (`syncId`)"
+                )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `deleted_transactions` (" +
+                        "`syncId` TEXT NOT NULL, " +
+                        "`deletedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`syncId`))"
                 )
             }
         }

@@ -2,6 +2,7 @@ package com.example.expensetracker.data.repository
 
 import com.example.expensetracker.core.time.DateRange
 import com.example.expensetracker.data.local.ExpenseDao
+import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
 import com.example.expensetracker.domain.model.AmountByCategory
@@ -32,6 +33,9 @@ class TransactionRepositoryImpl @Inject constructor(
     override suspend fun insert(transaction: TransactionEntity): Long = dao.insertTransaction(transaction)
     override suspend fun update(transaction: TransactionEntity) = dao.updateTransaction(transaction)
     override suspend fun deleteById(id: Long) = dao.deleteTransaction(id)
+
+    override suspend fun recordDeletion(syncId: String) =
+        dao.insertDeletedTransaction(DeletedTransactionEntity(syncId, System.currentTimeMillis()))
 
     override suspend fun findRecentAmountMatches(
         amountPaise: Long,

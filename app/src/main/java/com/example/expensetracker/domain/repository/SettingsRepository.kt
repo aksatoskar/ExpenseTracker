@@ -17,4 +17,11 @@ interface SettingsRepository {
     suspend fun setLastBudgetArchiveMonth(yearMonth: String)
     suspend fun setLastCloudSync(millis: Long)
     suspend fun setSyncPromptShown(shown: Boolean)
+
+    /**
+     * Returns the SMS-sync baseline: the earliest timestamp this install will scan from. Set once
+     * to [now] on first call and stable afterwards. Because DataStore is cleared on uninstall, a
+     * reinstall starts a fresh baseline so old SMS are never re-ingested.
+     */
+    suspend fun ensureSmsSyncBaseline(now: Long): Long
 }

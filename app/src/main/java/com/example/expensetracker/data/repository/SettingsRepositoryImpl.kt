@@ -83,6 +83,11 @@ class SettingsRepositoryImpl @Inject constructor(
         store.edit { it[KEY_SYNC_PROMPT_SHOWN] = shown }
     }
 
+    override suspend fun ensureSmsSyncBaseline(now: Long): Long {
+        val prefs = store.edit { if (it[KEY_SMS_BASELINE] == null) it[KEY_SMS_BASELINE] = now }
+        return prefs[KEY_SMS_BASELINE] ?: now
+    }
+
     private companion object {
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_complete")
         val KEY_DARK_THEME = booleanPreferencesKey("dark_theme")
@@ -90,5 +95,6 @@ class SettingsRepositoryImpl @Inject constructor(
         val KEY_LAST_ARCHIVE = stringPreferencesKey("last_budget_archive_month")
         val KEY_LAST_CLOUD_SYNC = longPreferencesKey("last_cloud_sync")
         val KEY_SYNC_PROMPT_SHOWN = booleanPreferencesKey("sync_prompt_shown")
+        val KEY_SMS_BASELINE = longPreferencesKey("sms_sync_baseline")
     }
 }

@@ -84,6 +84,7 @@ private class FakeTransactionRepository(private val spentPaise: Long) : Transact
     override suspend fun insert(transaction: TransactionEntity): Long = 0
     override suspend fun update(transaction: TransactionEntity) {}
     override suspend fun deleteById(id: Long) {}
+    override suspend fun recordDeletion(syncId: String) {}
     override suspend fun findRecentAmountMatches(amountPaise: Long, type: TransactionType, start: Long, end: Long): List<TransactionEntity> = emptyList()
     override suspend fun getMerchantRule(merchantKey: String): MerchantRuleEntity? = null
     override suspend fun upsertMerchantRule(rule: MerchantRuleEntity) {}

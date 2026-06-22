@@ -28,6 +28,9 @@ interface TransactionRepository {
     suspend fun update(transaction: TransactionEntity)
     suspend fun deleteById(id: Long)
 
+    /** Records a tombstone so a deleted, already-synced transaction is removed from the cloud too. */
+    suspend fun recordDeletion(syncId: String)
+
     suspend fun findRecentAmountMatches(
         amountPaise: Long,
         type: TransactionType,

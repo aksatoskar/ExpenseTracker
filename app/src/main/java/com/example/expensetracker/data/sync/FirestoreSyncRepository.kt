@@ -4,6 +4,7 @@ import com.example.expensetracker.core.concurrency.DispatcherProvider
 import com.example.expensetracker.data.local.ExpenseDao
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.MonthlyReportEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
@@ -42,15 +43,43 @@ class FirestoreSyncRepository @Inject constructor(
         var pushed = 0
         var pulled = 0
 
-        // --- Transactions: union by syncId ---
         val txnCol = userDoc.collection(COL_TRANSACTIONS)
-        val localTxns = dao.getAllTransactions().map { it.ensureSyncId() }
+
+        // --- Tombstones first: merge delete markers, then purge those records everywhere so a
+        // deletion is never resurrected by the union merge below. ---
+        val tombstoneCol = userDoc.collection(COL_DELETED_TRANSACTIONS)
+        val localTombstones = dao.getDeletedTransactions().associateBy { it.syncId }
+        val remoteTombstoneDocs = tombstoneCol.get().await().documents
+        val remoteTombstoneIds = remoteTombstoneDocs.map { it.id }.toSet()
+
+        remoteTombstoneDocs.forEach { doc ->
+            if (!localTombstones.containsKey(doc.id)) {
+                dao.insertDeletedTransaction(
+                    DeletedTransactionEntity(doc.id, doc.getLong("deletedAt") ?: System.currentTimeMillis())
+                )
+            }
+        }
+        localTombstones.values.forEach { tomb ->
+            if (tomb.syncId !in remoteTombstoneIds) {
+                tombstoneCol.document(tomb.syncId).set(mapOf("deletedAt" to tomb.deletedAt)).await()
+            }
+        }
+        val tombstoneIds: Set<String> = localTombstones.keys + remoteTombstoneIds
+        tombstoneIds.forEach { id ->
+            txnCol.document(id).delete().await()
+            dao.deleteTransactionBySyncId(id)
+        }
+
+        // --- Transactions: union by syncId, skipping anything tombstoned ---
+        val localTxns = dao.getAllTransactions()
+            .filter { it.syncId !in tombstoneIds }
+            .map { it.ensureSyncId() }
         val localBySync = localTxns.associateBy { it.syncId!! }
         val remoteTxns = txnCol.get().await().documents
-        val remoteIds = remoteTxns.mapNotNull { it.id }.toSet()
+        val remoteIds = remoteTxns.map { it.id }.toSet()
 
         remoteTxns.forEach { doc ->
-            if (!localBySync.containsKey(doc.id)) {
+            if (!localBySync.containsKey(doc.id) && doc.id !in tombstoneIds) {
                 dao.insertTransaction(doc.toTransaction())
                 pulled++
             }
@@ -255,6 +284,7 @@ class FirestoreSyncRepository @Inject constructor(
 
     private companion object {
         const val COL_TRANSACTIONS = "transactions"
+        const val COL_DELETED_TRANSACTIONS = "deletedTransactions"
         const val COL_BUDGETS = "budgets"
         const val COL_MERCHANT_RULES = "merchantRules"
         const val COL_BUDGET_HISTORY = "budgetHistory"

@@ -17,6 +17,9 @@ class DeleteTransactionUseCase @Inject constructor(
     suspend operator fun invoke(id: Long) {
         val existing = transactionRepository.getTransaction(id)
         transactionRepository.deleteById(id)
+        // If it was already synced, leave a tombstone so the deletion propagates to the cloud
+        // (and other devices) instead of being resurrected by the union merge.
+        existing?.syncId?.let { transactionRepository.recordDeletion(it) }
         notifier.cancel(id)
         existing?.category?.let { checkBudgetAlerts(it) }
     }

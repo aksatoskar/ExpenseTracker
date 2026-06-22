@@ -36,6 +36,17 @@ data class TransactionEntity(
     val syncId: String? = null
 )
 
+/**
+ * A "tombstone": records that a previously-synced transaction (identified by its [syncId]) was
+ * deleted, so the deletion can be propagated to the cloud and other devices instead of the record
+ * being resurrected by the union merge.
+ */
+@Entity(tableName = "deleted_transactions")
+data class DeletedTransactionEntity(
+    @PrimaryKey val syncId: String,
+    val deletedAt: Long
+)
+
 /** Learned mapping from a normalized merchant key to its category/priority, for auto-fill. */
 @Entity(tableName = "merchant_rules", indices = [Index(value = ["merchantKey"], unique = true)])
 data class MerchantRuleEntity(

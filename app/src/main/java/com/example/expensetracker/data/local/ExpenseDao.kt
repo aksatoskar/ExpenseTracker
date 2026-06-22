@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.MonthlyReportEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
@@ -43,6 +44,15 @@ interface ExpenseDao {
 
     @Query("UPDATE transactions SET syncId = :syncId WHERE id = :id")
     suspend fun setTransactionSyncId(id: Long, syncId: String)
+
+    @Query("DELETE FROM transactions WHERE syncId = :syncId")
+    suspend fun deleteTransactionBySyncId(syncId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDeletedTransaction(tombstone: DeletedTransactionEntity)
+
+    @Query("SELECT * FROM deleted_transactions")
+    suspend fun getDeletedTransactions(): List<DeletedTransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE id = :id")
     fun observeTransaction(id: Long): Flow<TransactionEntity?>

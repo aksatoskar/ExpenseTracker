@@ -20,7 +20,11 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ExpenseDatabase =
         Room.databaseBuilder(context, ExpenseDatabase::class.java, ExpenseDatabase.NAME)
-            .addMigrations(ExpenseDatabase.MIGRATION_1_2, ExpenseDatabase.MIGRATION_2_3)
+            .addMigrations(
+                ExpenseDatabase.MIGRATION_1_2,
+                ExpenseDatabase.MIGRATION_2_3,
+                ExpenseDatabase.MIGRATION_3_4
+            )
             .fallbackToDestructiveMigration()
             .build()
 

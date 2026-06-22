@@ -19,8 +19,4 @@ class SmsRepositoryImpl @Inject constructor(
     override fun canReadSms(): Boolean = PermissionHelper.hasReadSmsPermission(context)
 
     override fun readSince(sinceMillis: Long): List<RawSms> = smsReader.readSince(sinceMillis)
-
-    override fun appInstallTimeMillis(): Long = runCatching {
-        context.packageManager.getPackageInfo(context.packageName, 0).firstInstallTime
-    }.getOrDefault(System.currentTimeMillis())
 }
