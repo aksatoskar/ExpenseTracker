@@ -153,6 +153,18 @@ interface ExpenseDao {
     @Query("SELECT * FROM detected_messages ORDER BY timestamp DESC")
     fun observeDetectedMessages(): Flow<List<DetectedMessageEntity>>
 
+    @Query(
+        "SELECT * FROM detected_messages " +
+            "WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC"
+    )
+    fun observeDetectedMessagesToday(start: Long, end: Long): Flow<List<DetectedMessageEntity>>
+
+    @Query(
+        "SELECT * FROM detected_messages WHERE timestamp < :before " +
+            "ORDER BY timestamp DESC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun getPastDetectedMessages(before: Long, limit: Int, offset: Int): List<DetectedMessageEntity>
+
     @Query("SELECT COUNT(*) FROM detected_messages")
     fun observeDetectedMessageCount(): Flow<Int>
 

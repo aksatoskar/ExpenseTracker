@@ -1,5 +1,6 @@
 package com.example.expensetracker.data.repository
 
+import com.example.expensetracker.core.time.DateRange
 import com.example.expensetracker.data.local.ExpenseDao
 import com.example.expensetracker.data.local.entity.DetectedMessageEntity
 import com.example.expensetracker.domain.repository.DetectedMessageRepository
@@ -13,7 +14,16 @@ class DetectedMessageRepositoryImpl @Inject constructor(
 ) : DetectedMessageRepository {
 
     override val messages: Flow<List<DetectedMessageEntity>> = dao.observeDetectedMessages()
+    override val todayMessages: Flow<List<DetectedMessageEntity>> =
+        DateRange.today().let { range ->
+            dao.observeDetectedMessagesToday(range.startMillis, range.endMillis)
+        }
     override val count: Flow<Int> = dao.observeDetectedMessageCount()
+
+    override suspend fun getPastMessages(page: Int, pageSize: Int): List<DetectedMessageEntity> {
+        val before = DateRange.today().startMillis
+        return dao.getPastDetectedMessages(before, pageSize, page * pageSize)
+    }
 
     override suspend fun insert(message: DetectedMessageEntity): Long =
         dao.insertDetectedMessage(message)
