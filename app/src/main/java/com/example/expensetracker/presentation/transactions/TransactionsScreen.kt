@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -33,10 +34,18 @@ import com.example.expensetracker.presentation.common.TransactionRow
 
 /** Transactions tab with merchant search, period chips, sort/category dropdowns and a summary. */
 @Composable
-fun TransactionsScreen(openReview: (Long) -> Unit) {
+fun TransactionsScreen(
+    openReview: (Long) -> Unit,
+    navToken: Int = 0,
+    initialPeriod: TxnPeriod = TxnPeriod.All
+) {
     val vm: TransactionsViewModel = hiltViewModel()
     val state by vm.uiState.collectAsState()
     val result = state.transactions
+
+    LaunchedEffect(navToken) {
+        if (navToken > 0) vm.applyNavFilters(initialPeriod)
+    }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {

@@ -1,5 +1,6 @@
 package com.example.expensetracker.presentation.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,7 @@ import com.example.expensetracker.presentation.settings.DetectedMessagesScreen
 import com.example.expensetracker.presentation.settings.SettingsScreen
 import com.example.expensetracker.presentation.theme.ExpenseTrackerTheme
 import com.example.expensetracker.presentation.transactions.TransactionsScreen
+import com.example.expensetracker.presentation.transactions.TxnPeriod
 
 /**
  * Root composable: applies the theme, gates onboarding, hosts the bottom-nav shell and renders
@@ -152,11 +154,35 @@ private fun AppShell(
     logScreen: (String) -> Unit
 ) {
     var tab by remember { mutableIntStateOf(0) }
+    var tabBackStack by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var transactionsNavToken by remember { mutableIntStateOf(0) }
+    var transactionsPeriod by remember { mutableStateOf(TxnPeriod.All) }
+    var analyticsNavToken by remember { mutableIntStateOf(0) }
+    var analyticsRange by remember { mutableStateOf("Month") }
     var showAddTransaction by remember { mutableStateOf(false) }
     val dashboardVm: DashboardViewModel = hiltViewModel()
     val tabs = listOf("Home", "Txns", "Charts", "Budget", "Settings")
     val icons = listOf(Icons.Default.Dashboard, Icons.Default.ReceiptLong, Icons.Default.Analytics, Icons.Default.Payments, Icons.Default.Settings)
     LaunchedEffect(tab) { logScreen(tabs[tab]) }
+
+    BackHandler(enabled = tabBackStack.isNotEmpty()) {
+        tab = tabBackStack.last()
+        tabBackStack = tabBackStack.dropLast(1)
+    }
+
+    fun openTransactionsFromHome(period: TxnPeriod = TxnPeriod.All) {
+        if (tab != 1) tabBackStack = listOf(tab)
+        tab = 1
+        transactionsPeriod = period
+        transactionsNavToken++
+    }
+
+    fun openChartsFromHome(range: String = "Month") {
+        if (tab != 2) tabBackStack = listOf(tab)
+        tab = 2
+        analyticsRange = range
+        analyticsNavToken++
+    }
     Scaffold(
         floatingActionButton = {
             if (tab == 0) {
@@ -178,7 +204,10 @@ private fun AppShell(
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = tab == index,
-                        onClick = { tab = index },
+                        onClick = {
+                            if (index != tab) tabBackStack = emptyList()
+                            tab = index
+                        },
                         icon = { Icon(icons[index], contentDescription = title) },
                         label = {
                             Text(title, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
@@ -197,9 +226,18 @@ private fun AppShell(
     ) { padding ->
         Box(Modifier.padding(padding)) {
             when (tab) {
-                0 -> DashboardScreen(openReview = openReview, openPendingReview = openPendingReview)
-                1 -> TransactionsScreen(openReview)
-                2 -> AnalyticsScreen()
+                0 -> DashboardScreen(
+                    openReview = openReview,
+                    openPendingReview = openPendingReview,
+                    openTransactionsTab = ::openTransactionsFromHome,
+                    openChartsTab = { openChartsFromHome("Month") }
+                )
+                1 -> TransactionsScreen(
+                    openReview = openReview,
+                    navToken = transactionsNavToken,
+                    initialPeriod = transactionsPeriod
+                )
+                2 -> AnalyticsScreen(navToken = analyticsNavToken, initialRange = analyticsRange)
                 3 -> BudgetScreen(openBudget)
                 else -> SettingsScreen(onOpenDetectedMessages = openDetectedMessages)
             }

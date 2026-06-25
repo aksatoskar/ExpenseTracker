@@ -24,6 +24,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -44,10 +45,17 @@ import com.example.expensetracker.presentation.common.categoryColor
 
 /** Charts tab: category pie, spending bars, a trend sparkline and top merchants/categories. */
 @Composable
-fun AnalyticsScreen() {
+fun AnalyticsScreen(
+    navToken: Int = 0,
+    initialRange: String = "Month"
+) {
     val vm: AnalyticsViewModel = hiltViewModel()
     val analytics by vm.analytics.collectAsState()
     val selected by vm.selectedRange.collectAsState()
+
+    LaunchedEffect(navToken) {
+        if (navToken > 0) vm.setRange(initialRange)
+    }
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             TabRow(

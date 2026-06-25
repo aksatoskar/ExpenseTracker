@@ -58,7 +58,7 @@ interface ExpenseDao {
     @Query("SELECT * FROM transactions WHERE id = :id")
     fun observeTransaction(id: Long): Flow<TransactionEntity?>
 
-    @Query("SELECT * FROM transactions WHERE status = 'Reviewed' ORDER BY timestamp DESC LIMIT 10")
+    @Query("SELECT * FROM transactions WHERE status = 'Reviewed' ORDER BY timestamp DESC LIMIT 5")
     fun observeLatestTransactions(): Flow<List<TransactionEntity>>
 
     @Query("SELECT * FROM transactions WHERE status = 'Reviewed' ORDER BY timestamp DESC")

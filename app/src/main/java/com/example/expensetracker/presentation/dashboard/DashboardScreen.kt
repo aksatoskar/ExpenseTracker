@@ -2,6 +2,7 @@ package com.example.expensetracker.presentation.dashboard
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,19 +63,22 @@ import com.example.expensetracker.presentation.common.categoryColor
 import com.example.expensetracker.presentation.common.categoryIcon
 import com.example.expensetracker.presentation.common.syncTimeText
 import com.example.expensetracker.presentation.settings.SettingsViewModel
+import com.example.expensetracker.presentation.transactions.TxnPeriod
 
 /** Home tab: spending hero, priority breakdown, smart insights and recent transactions. */
 @Composable
 fun DashboardScreen(
     openReview: (Long) -> Unit,
-    openPendingReview: () -> Unit
+    openPendingReview: () -> Unit,
+    openTransactionsTab: (TxnPeriod) -> Unit,
+    openChartsTab: () -> Unit
 ) {
     val vm: DashboardViewModel = hiltViewModel()
     val state by vm.uiState.collectAsState()
     val dashboard = state.dashboard
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { DashboardHero(dashboard) }
+        item { DashboardHero(dashboard, openTransactionsTab, openChartsTab) }
         item { SyncStatusCard() }
         if (dashboard.pendingCount > 0) {
             item {
@@ -81,31 +87,47 @@ fun DashboardScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
                 ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Text(
                             pendingMessage(dashboard.pendingCount),
+                            Modifier.fillMaxWidth(),
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 3
                         )
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            TextButton(onClick = openPendingReview) {
+                            TextButton(
+                                onClick = openPendingReview,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.heightIn(min = 36.dp)
+                            ) {
                                 Text(
                                     "View all",
                                     color = MaterialTheme.colorScheme.tertiary,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.labelLarge
                                 )
                             }
                             TextButton(
-                                onClick = { state.pending.firstOrNull()?.let { openReview(it.id) } }
+                                onClick = { state.pending.firstOrNull()?.let { openReview(it.id) } },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.heightIn(min = 36.dp)
                             ) {
                                 Text(
                                     "Review now",
                                     color = MaterialTheme.colorScheme.tertiary,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.labelLarge
                                 )
                             }
                         }
@@ -119,6 +141,22 @@ fun DashboardScreen(
         item { InsightList(dashboard, state.budgets) }
         item { SectionHeader("Recent Transactions") }
         items(state.latest) { TransactionRow(it, onClick = { openReview(it.id) }) }
+        if (state.latest.isNotEmpty()) {
+            item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(onClick = { openTransactionsTab(TxnPeriod.All) }) {
+                        Text(
+                            "View all transactions",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -176,12 +214,17 @@ private fun SyncStatusCard() {
 }
 
 @Composable
-private fun DashboardHero(state: DashboardState) {
+private fun DashboardHero(
+    state: DashboardState,
+    openTransactionsTab: (TxnPeriod) -> Unit,
+    openChartsTab: () -> Unit
+) {
     Box(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)))
+            .clickable(onClick = openChartsTab)
             .padding(22.dp)
     ) {
         Column {
@@ -199,19 +242,35 @@ private fun DashboardHero(state: DashboardState) {
             Text(formatInr(state.monthPaise), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = Color.White)
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                HeroStatPill("Today", state.todayPaise, Modifier.weight(1f))
-                HeroStatPill("This week", state.weekPaise, Modifier.weight(1f))
+                HeroStatPill(
+                    label = "Today",
+                    amountPaise = state.todayPaise,
+                    modifier = Modifier.weight(1f),
+                    onClick = { openTransactionsTab(TxnPeriod.Today) }
+                )
+                HeroStatPill(
+                    label = "This week",
+                    amountPaise = state.weekPaise,
+                    modifier = Modifier.weight(1f),
+                    onClick = { openTransactionsTab(TxnPeriod.Week) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun HeroStatPill(label: String, amountPaise: Long, modifier: Modifier = Modifier) {
+private fun HeroStatPill(
+    label: String,
+    amountPaise: Long,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Column(
         modifier
             .clip(RoundedCornerShape(14.dp))
             .background(Color.White.copy(alpha = 0.18f))
+            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))

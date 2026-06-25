@@ -88,6 +88,15 @@ class TransactionsViewModel @Inject constructor(
     fun setPeriod(value: TxnPeriod) { period.value = value }
     fun setCategory(value: Category?) { category.value = value }
 
+    fun resetFilters() = applyNavFilters(TxnPeriod.All)
+
+    fun applyNavFilters(txnPeriod: TxnPeriod) {
+        query.value = ""
+        sort.value = TxnSort.DateNewest
+        period.value = txnPeriod
+        category.value = null
+    }
+
     private companion object {
         fun periodStartMillis(period: TxnPeriod): Long {
             if (period == TxnPeriod.All) return Long.MIN_VALUE
