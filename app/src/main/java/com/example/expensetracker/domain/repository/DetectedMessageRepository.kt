@@ -10,6 +10,7 @@ interface DetectedMessageRepository {
 
     suspend fun insert(message: DetectedMessageEntity): Long
     suspend fun hasNearDuplicate(rawText: String, timestamp: Long, windowMillis: Long): Boolean
+    suspend fun getRecentMessages(timestamp: Long, windowMillis: Long): List<DetectedMessageEntity>
     suspend fun deleteById(id: Long)
     suspend fun clearAll()
 }

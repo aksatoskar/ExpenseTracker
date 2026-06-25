@@ -167,4 +167,7 @@ interface ExpenseDao {
             "WHERE rawText = :rawText AND timestamp BETWEEN :start AND :end"
     )
     suspend fun hasDetectedMessage(rawText: String, start: Long, end: Long): Boolean
+
+    @Query("SELECT * FROM detected_messages WHERE timestamp BETWEEN :start AND :end")
+    suspend fun getDetectedMessagesBetween(start: Long, end: Long): List<DetectedMessageEntity>
 }
