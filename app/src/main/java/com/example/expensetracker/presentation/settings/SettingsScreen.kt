@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -124,7 +125,10 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             if (currentUser != null) Icons.Default.CloudDone else Icons.Default.CloudSync,
@@ -171,30 +175,36 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Button(
-                            onClick = {
-                                vm.cloudSyncNow { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() }
-                            },
-                            enabled = !isCloudSyncing,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                        Column(
+                            Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            if (isCloudSyncing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text("Syncing...")
-                            } else {
-                                Text("Sync now")
+                            Button(
+                                onClick = {
+                                    vm.cloudSyncNow { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() }
+                                },
+                                enabled = !isCloudSyncing,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                if (isCloudSyncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Syncing...")
+                                } else {
+                                    Text("Sync now")
+                                }
                             }
+                            TextButton(
+                                onClick = { vm.signOut() },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(vertical = 0.dp)
+                            ) { Text("Sign out") }
                         }
-                        TextButton(
-                            onClick = { vm.signOut() },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Sign out") }
                     }
                 }
             }
