@@ -23,7 +23,8 @@ object DatabaseModule {
             .addMigrations(
                 ExpenseDatabase.MIGRATION_1_2,
                 ExpenseDatabase.MIGRATION_2_3,
-                ExpenseDatabase.MIGRATION_3_4
+                ExpenseDatabase.MIGRATION_3_4,
+                ExpenseDatabase.MIGRATION_4_5
             )
             .fallbackToDestructiveMigration()
             .build()

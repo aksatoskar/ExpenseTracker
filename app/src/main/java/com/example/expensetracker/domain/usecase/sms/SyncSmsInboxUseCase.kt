@@ -4,6 +4,7 @@ import com.example.expensetracker.core.concurrency.DispatcherProvider
 import com.example.expensetracker.domain.parser.TransactionParser
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.repository.SmsRepository
+import com.example.expensetracker.domain.usecase.detection.RecordDetectedMessageUseCase
 import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -22,6 +23,7 @@ class SyncSmsInboxUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val parser: TransactionParser,
     private val ingestTransaction: IngestTransactionUseCase,
+    private val recordDetectedMessage: RecordDetectedMessageUseCase,
     private val dispatchers: DispatcherProvider
 ) {
     companion object {
@@ -39,6 +41,7 @@ class SyncSmsInboxUseCase @Inject constructor(
         var newCount = 0
         smsRepository.readSince(since).forEach { sms ->
             val parsed = parser.parse(sms.body, "SMS", sms.timestamp) ?: return@forEach
+            recordDetectedMessage(parsed)
             if (ingestTransaction(parsed)) newCount++
         }
         settingsRepository.setLastSmsSync(now)

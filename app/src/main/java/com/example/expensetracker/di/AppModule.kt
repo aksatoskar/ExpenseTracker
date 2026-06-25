@@ -4,11 +4,13 @@ import com.example.expensetracker.core.concurrency.DefaultDispatcherProvider
 import com.example.expensetracker.core.concurrency.DispatcherProvider
 import com.example.expensetracker.data.notification.AndroidNotifier
 import com.example.expensetracker.data.repository.BudgetRepositoryImpl
+import com.example.expensetracker.data.repository.DetectedMessageRepositoryImpl
 import com.example.expensetracker.data.repository.SettingsRepositoryImpl
 import com.example.expensetracker.data.repository.SmsRepositoryImpl
 import com.example.expensetracker.data.repository.TransactionRepositoryImpl
 import com.example.expensetracker.domain.notification.Notifier
 import com.example.expensetracker.domain.repository.BudgetRepository
+import com.example.expensetracker.domain.repository.DetectedMessageRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.repository.SmsRepository
 import com.example.expensetracker.domain.repository.TransactionRepository
@@ -30,6 +32,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindBudgetRepository(impl: BudgetRepositoryImpl): BudgetRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDetectedMessageRepository(impl: DetectedMessageRepositoryImpl): DetectedMessageRepository
 
     @Binds
     @Singleton

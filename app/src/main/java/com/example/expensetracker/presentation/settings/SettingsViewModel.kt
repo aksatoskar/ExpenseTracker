@@ -9,6 +9,7 @@ import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.auth.AuthRepository
 import com.example.expensetracker.domain.auth.AuthUser
 import com.example.expensetracker.domain.notification.Notifier
+import com.example.expensetracker.domain.repository.DetectedMessageRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
 import com.example.expensetracker.domain.usecase.sync.SyncDataUseCase
@@ -34,8 +35,12 @@ class SettingsViewModel @Inject constructor(
     private val analytics: AnalyticsTracker,
     private val authRepository: AuthRepository,
     private val googleCredentialClient: GoogleCredentialClient,
-    private val syncData: SyncDataUseCase
+    private val syncData: SyncDataUseCase,
+    detectedMessageRepository: DetectedMessageRepository
 ) : ViewModel() {
+
+    val detectedMessageCount: StateFlow<Int> =
+        detectedMessageRepository.count.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     val darkTheme: StateFlow<Boolean> =
         settingsRepository.darkTheme.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

@@ -5,6 +5,7 @@ import android.service.notification.StatusBarNotification
 import com.example.expensetracker.domain.crash.CrashReporter
 import com.example.expensetracker.domain.parser.NotificationTextExtractor
 import com.example.expensetracker.domain.parser.TransactionParser
+import com.example.expensetracker.domain.usecase.detection.RecordDetectedMessageUseCase
 import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
 import com.example.expensetracker.sync.IngestWorker
 import com.example.expensetracker.sync.PendingNotificationWorker
@@ -15,16 +16,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Listens to other apps' payment notifications (UPI/banking), parses debits and ingests them.
- * On reconnect it also triggers missed-notification recovery.
- */
+/** Listens to payment notifications, records parsed debits and ingests them. */
 @AndroidEntryPoint
 class PaymentNotificationListener : NotificationListenerService() {
 
     @Inject lateinit var ingestTransaction: IngestTransactionUseCase
     @Inject lateinit var parser: TransactionParser
     @Inject lateinit var crashReporter: CrashReporter
+    @Inject lateinit var recordDetectedMessage: RecordDetectedMessageUseCase
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -43,6 +42,7 @@ class PaymentNotificationListener : NotificationListenerService() {
         val appContext = applicationContext
         scope.launch {
             try {
+                recordDetectedMessage(parsed, sbn.packageName)
                 ingestTransaction(parsed)
             } catch (e: Exception) {
                 crashReporter.recordNonFatal(e)

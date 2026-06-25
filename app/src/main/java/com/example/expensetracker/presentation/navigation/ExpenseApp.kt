@@ -47,6 +47,7 @@ import com.example.expensetracker.presentation.dashboard.DashboardViewModel
 import com.example.expensetracker.presentation.onboarding.OnboardingScreen
 import com.example.expensetracker.presentation.review.ReviewDialog
 import com.example.expensetracker.presentation.review.ReviewViewModel
+import com.example.expensetracker.presentation.settings.DetectedMessagesScreen
 import com.example.expensetracker.presentation.settings.SettingsScreen
 import com.example.expensetracker.presentation.theme.ExpenseTrackerTheme
 import com.example.expensetracker.presentation.transactions.TransactionsScreen
@@ -61,6 +62,7 @@ fun ExpenseApp(startReviewId: Long?) {
     val state by appVm.uiState.collectAsState()
     var reviewId by remember { mutableStateOf(startReviewId) }
     var budgetCategory by remember { mutableStateOf<Category?>(null) }
+    var showDetectedMessages by remember { mutableStateOf(false) }
 
     ExpenseTrackerTheme(darkTheme = state.darkTheme) {
         Surface(
@@ -76,6 +78,7 @@ fun ExpenseApp(startReviewId: Long?) {
                     AppShell(
                         openReview = { reviewId = it },
                         openBudget = { budgetCategory = it },
+                        openDetectedMessages = { showDetectedMessages = true },
                         logScreen = appVm::logScreen
                     )
                     if (showSyncPrompt) {
@@ -103,6 +106,9 @@ fun ExpenseApp(startReviewId: Long?) {
                             openReview = { reviewId = it }
                         )
                     }
+                    if (showDetectedMessages) {
+                        DetectedMessagesScreen(onBack = { showDetectedMessages = false })
+                    }
                     reviewId?.let { id ->
                         val reviewVm: ReviewViewModel = hiltViewModel()
                         val flow = remember(id) { reviewVm.observeTransaction(id) }
@@ -129,7 +135,12 @@ fun ExpenseApp(startReviewId: Long?) {
 }
 
 @Composable
-private fun AppShell(openReview: (Long) -> Unit, openBudget: (Category) -> Unit, logScreen: (String) -> Unit) {
+private fun AppShell(
+    openReview: (Long) -> Unit,
+    openBudget: (Category) -> Unit,
+    openDetectedMessages: () -> Unit,
+    logScreen: (String) -> Unit
+) {
     var tab by remember { mutableIntStateOf(0) }
     var showAddTransaction by remember { mutableStateOf(false) }
     val dashboardVm: DashboardViewModel = hiltViewModel()
@@ -180,7 +191,7 @@ private fun AppShell(openReview: (Long) -> Unit, openBudget: (Category) -> Unit,
                 1 -> TransactionsScreen(openReview)
                 2 -> AnalyticsScreen()
                 3 -> BudgetScreen(openBudget)
-                else -> SettingsScreen()
+                else -> SettingsScreen(onOpenDetectedMessages = openDetectedMessages)
             }
         }
     }

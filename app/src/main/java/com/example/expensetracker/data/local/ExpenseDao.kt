@@ -8,6 +8,7 @@ import androidx.room.Update
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
 import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
+import com.example.expensetracker.data.local.entity.DetectedMessageEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.MonthlyReportEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
@@ -145,4 +146,25 @@ interface ExpenseDao {
 
     @Query("SELECT COUNT(*) FROM budget_history WHERE yearMonth = :yearMonth")
     suspend fun budgetHistoryCount(yearMonth: String): Int
+
+    @Insert
+    suspend fun insertDetectedMessage(message: DetectedMessageEntity): Long
+
+    @Query("SELECT * FROM detected_messages ORDER BY timestamp DESC")
+    fun observeDetectedMessages(): Flow<List<DetectedMessageEntity>>
+
+    @Query("SELECT COUNT(*) FROM detected_messages")
+    fun observeDetectedMessageCount(): Flow<Int>
+
+    @Query("DELETE FROM detected_messages WHERE id = :id")
+    suspend fun deleteDetectedMessage(id: Long)
+
+    @Query("DELETE FROM detected_messages")
+    suspend fun clearDetectedMessages()
+
+    @Query(
+        "SELECT COUNT(*) > 0 FROM detected_messages " +
+            "WHERE rawText = :rawText AND timestamp BETWEEN :start AND :end"
+    )
+    suspend fun hasDetectedMessage(rawText: String, start: Long, end: Long): Boolean
 }

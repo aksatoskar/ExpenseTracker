@@ -6,6 +6,7 @@ import android.content.Intent
 import android.provider.Telephony
 import com.example.expensetracker.domain.crash.CrashReporter
 import com.example.expensetracker.domain.parser.TransactionParser
+import com.example.expensetracker.domain.usecase.detection.RecordDetectedMessageUseCase
 import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
 import com.example.expensetracker.sync.IngestWorker
 import dagger.hilt.EntryPoint
@@ -20,9 +21,6 @@ import kotlinx.coroutines.launch
 /**
  * Receives incoming SMS broadcasts, parses debit messages and ingests them immediately.
  * Falls back to [IngestWorker] if direct ingestion fails, so detection is never lost.
- *
- * Dependencies are pulled from the Hilt singleton graph via [EntryPointAccessors] (the
- * compile-safe injection path for broadcast receivers).
  */
 class SmsReceiver : BroadcastReceiver() {
 
@@ -32,6 +30,7 @@ class SmsReceiver : BroadcastReceiver() {
         fun ingestTransactionUseCase(): IngestTransactionUseCase
         fun transactionParser(): TransactionParser
         fun crashReporter(): CrashReporter
+        fun recordDetectedMessage(): RecordDetectedMessageUseCase
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -43,15 +42,15 @@ class SmsReceiver : BroadcastReceiver() {
 
         val appContext = context.applicationContext
         val entryPoint = EntryPointAccessors.fromApplication(appContext, SmsReceiverEntryPoint::class.java)
-
         val timestamp = messages.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
+        val sender = messages.firstOrNull()?.originatingAddress
         val parsed = entryPoint.transactionParser().parse(text, "SMS", timestamp) ?: return
-        val ingestTransaction = entryPoint.ingestTransactionUseCase()
 
         val pendingResult = goAsync()
         scope.launch {
             try {
-                ingestTransaction(parsed)
+                entryPoint.recordDetectedMessage()(parsed, sender)
+                entryPoint.ingestTransactionUseCase()(parsed)
             } catch (e: Exception) {
                 entryPoint.crashReporter().recordNonFatal(e)
                 IngestWorker.enqueue(appContext, parsed)

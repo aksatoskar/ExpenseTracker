@@ -9,6 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
 import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
+import com.example.expensetracker.data.local.entity.DetectedMessageEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.MonthlyReportEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
@@ -36,9 +37,10 @@ class ExpenseConverters {
         BudgetEntity::class,
         MonthlyReportEntity::class,
         BudgetHistoryEntity::class,
-        DeletedTransactionEntity::class
+        DeletedTransactionEntity::class,
+        DetectedMessageEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(ExpenseConverters::class)
@@ -83,6 +85,29 @@ abstract class ExpenseDatabase : RoomDatabase() {
                         "`syncId` TEXT NOT NULL, " +
                         "`deletedAt` INTEGER NOT NULL, " +
                         "PRIMARY KEY(`syncId`))"
+                )
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `detected_messages` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`source` TEXT NOT NULL, " +
+                        "`rawText` TEXT NOT NULL, " +
+                        "`sender` TEXT, " +
+                        "`timestamp` INTEGER NOT NULL, " +
+                        "`amountPaise` INTEGER NOT NULL, " +
+                        "`merchant` TEXT NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_detected_messages_timestamp` " +
+                        "ON `detected_messages` (`timestamp`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_detected_messages_source` " +
+                        "ON `detected_messages` (`source`)"
                 )
             }
         }

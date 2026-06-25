@@ -24,10 +24,12 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -56,14 +58,16 @@ import com.example.expensetracker.presentation.common.syncTimeText
 import com.example.expensetracker.util.PermissionHelper
 
 /** Settings tab: theme toggle, detection-reliability permission status and privacy info. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
     val context = LocalContext.current
     val vm: SettingsViewModel = hiltViewModel()
     val darkTheme by vm.darkTheme.collectAsState()
     val currentUser by vm.currentUser.collectAsState()
     val lastCloudSync by vm.lastCloudSync.collectAsState()
     val isCloudSyncing by vm.isCloudSyncing.collectAsState()
+    val detectedMessageCount by vm.detectedMessageCount.collectAsState()
     var refreshKey by remember { mutableIntStateOf(0) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -196,6 +200,40 @@ fun SettingsScreen() {
             }
         }
         item { SectionHeader("Detection Reliability") }
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                onClick = onOpenDetectedMessages
+            ) {
+                Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.ReceiptLong,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Detected messages", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (detectedMessageCount == 0) {
+                                "SMS & notifications parsed as debit transactions"
+                            } else {
+                                "$detectedMessageCount stored message${if (detectedMessageCount == 1) "" else "s"}"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        "View",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
         item {
             Text(
                 "All permissions below must be enabled for expense detection to work when the app is closed.",

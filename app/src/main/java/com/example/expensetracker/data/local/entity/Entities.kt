@@ -47,6 +47,18 @@ data class DeletedTransactionEntity(
     val deletedAt: Long
 )
 
+/** Raw SMS or notification the parser classified as a debit transaction, kept for user review. */
+@Entity(tableName = "detected_messages", indices = [Index("timestamp"), Index("source")])
+data class DetectedMessageEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val source: String,
+    val rawText: String,
+    val sender: String? = null,
+    val timestamp: Long,
+    val amountPaise: Long,
+    val merchant: String
+)
+
 /** Learned mapping from a normalized merchant key to its category/priority, for auto-fill. */
 @Entity(tableName = "merchant_rules", indices = [Index(value = ["merchantKey"], unique = true)])
 data class MerchantRuleEntity(
