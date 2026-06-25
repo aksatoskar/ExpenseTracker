@@ -2,7 +2,6 @@ package com.example.expensetracker.presentation.dashboard
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +31,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -63,7 +63,10 @@ import com.example.expensetracker.presentation.settings.SettingsViewModel
 
 /** Home tab: spending hero, priority breakdown, smart insights and recent transactions. */
 @Composable
-fun DashboardScreen(openReview: (Long) -> Unit) {
+fun DashboardScreen(
+    openReview: (Long) -> Unit,
+    openPendingReview: () -> Unit
+) {
     val vm: DashboardViewModel = hiltViewModel()
     val state by vm.uiState.collectAsState()
     val dashboard = state.dashboard
@@ -74,18 +77,38 @@ fun DashboardScreen(openReview: (Long) -> Unit) {
         if (dashboard.pendingCount > 0) {
             item {
                 Card(
-                    Modifier.fillMaxWidth().clickable { state.pending.firstOrNull()?.let { openReview(it.id) } },
+                    Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
                 ) {
-                    Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            "You have ${dashboard.pendingCount} uncategorized transactions.",
+                            pendingMessage(dashboard.pendingCount),
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.weight(1f)
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
-                        Text("Review Now", color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = openPendingReview) {
+                                Text(
+                                    "View all",
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            TextButton(
+                                onClick = { state.pending.firstOrNull()?.let { openReview(it.id) } }
+                            ) {
+                                Text(
+                                    "Review now",
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -98,6 +121,12 @@ fun DashboardScreen(openReview: (Long) -> Unit) {
         items(state.latest) { TransactionRow(it, onClick = { openReview(it.id) }) }
     }
 }
+
+private fun pendingMessage(count: Int): String =
+    when (count) {
+        1 -> "You have 1 uncategorized transaction."
+        else -> "You have $count uncategorized transactions."
+    }
 
 @Composable
 private fun SyncStatusCard() {

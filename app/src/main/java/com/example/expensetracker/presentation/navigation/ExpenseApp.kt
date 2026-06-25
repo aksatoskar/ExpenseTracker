@@ -45,6 +45,7 @@ import com.example.expensetracker.presentation.dashboard.AddTransactionDialog
 import com.example.expensetracker.presentation.dashboard.DashboardScreen
 import com.example.expensetracker.presentation.dashboard.DashboardViewModel
 import com.example.expensetracker.presentation.onboarding.OnboardingScreen
+import com.example.expensetracker.presentation.review.PendingReviewScreen
 import com.example.expensetracker.presentation.review.ReviewDialog
 import com.example.expensetracker.presentation.review.ReviewViewModel
 import com.example.expensetracker.presentation.settings.DetectedMessagesScreen
@@ -63,6 +64,7 @@ fun ExpenseApp(startReviewId: Long?) {
     var reviewId by remember { mutableStateOf(startReviewId) }
     var budgetCategory by remember { mutableStateOf<Category?>(null) }
     var showDetectedMessages by remember { mutableStateOf(false) }
+    var showPendingReview by remember { mutableStateOf(false) }
 
     ExpenseTrackerTheme(darkTheme = state.darkTheme) {
         Surface(
@@ -77,6 +79,7 @@ fun ExpenseApp(startReviewId: Long?) {
                     val showSyncPrompt by appVm.showSyncPrompt.collectAsState()
                     AppShell(
                         openReview = { reviewId = it },
+                        openPendingReview = { showPendingReview = true },
                         openBudget = { budgetCategory = it },
                         openDetectedMessages = { showDetectedMessages = true },
                         logScreen = appVm::logScreen
@@ -109,6 +112,12 @@ fun ExpenseApp(startReviewId: Long?) {
                     if (showDetectedMessages) {
                         DetectedMessagesScreen(onBack = { showDetectedMessages = false })
                     }
+                    if (showPendingReview) {
+                        PendingReviewScreen(
+                            onBack = { showPendingReview = false },
+                            openReview = { reviewId = it }
+                        )
+                    }
                     reviewId?.let { id ->
                         val reviewVm: ReviewViewModel = hiltViewModel()
                         val flow = remember(id) { reviewVm.observeTransaction(id) }
@@ -137,6 +146,7 @@ fun ExpenseApp(startReviewId: Long?) {
 @Composable
 private fun AppShell(
     openReview: (Long) -> Unit,
+    openPendingReview: () -> Unit,
     openBudget: (Category) -> Unit,
     openDetectedMessages: () -> Unit,
     logScreen: (String) -> Unit
@@ -187,7 +197,7 @@ private fun AppShell(
     ) { padding ->
         Box(Modifier.padding(padding)) {
             when (tab) {
-                0 -> DashboardScreen(openReview)
+                0 -> DashboardScreen(openReview = openReview, openPendingReview = openPendingReview)
                 1 -> TransactionsScreen(openReview)
                 2 -> AnalyticsScreen()
                 3 -> BudgetScreen(openBudget)
