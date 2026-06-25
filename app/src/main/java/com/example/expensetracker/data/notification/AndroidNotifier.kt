@@ -97,6 +97,26 @@ class AndroidNotifier @Inject constructor(
         return true
     }
 
+    override fun showPendingReviewReminder(pendingCount: Int): Boolean {
+        if (!areNotificationsEnabled() || pendingCount <= 0) return false
+        val title = if (pendingCount == 1) {
+            "1 transaction to review"
+        } else {
+            "$pendingCount transactions to review"
+        }
+        val body = "Tap to categorize your pending expenses."
+        val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(PendingIntent.getActivity(context, PENDING_REVIEW_DAILY_ID, MainActivity.intent(context), flags()))
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(PENDING_REVIEW_DAILY_ID, notification)
+        return true
+    }
+
     override fun showTest(): Boolean {
         if (!areNotificationsEnabled()) return false
         val notification = NotificationCompat.Builder(context, DETECTED_CHANNEL)
@@ -166,5 +186,6 @@ class AndroidNotifier @Inject constructor(
         const val BUDGET_CHANNEL = "budget_alerts"
         private const val REMINDER_ID_OFFSET = 100_000
         private const val BUDGET_ALERT_BASE_ID = 50_000
+        private const val PENDING_REVIEW_DAILY_ID = 31_000
     }
 }

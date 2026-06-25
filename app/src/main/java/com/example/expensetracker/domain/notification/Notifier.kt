@@ -15,6 +15,9 @@ interface Notifier {
 
     fun showReminder(transactionId: Long, title: String, body: String): Boolean
 
+    /** Summary reminder when one or more transactions still need review. */
+    fun showPendingReviewReminder(pendingCount: Int): Boolean
+
     fun showTest(): Boolean
 
     fun showBudgetAlert(category: Category, thresholdPercent: Int, spentPaise: Long, limitPaise: Long): Boolean

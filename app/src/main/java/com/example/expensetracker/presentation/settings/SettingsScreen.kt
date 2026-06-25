@@ -305,7 +305,7 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Privacy-first architecture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "All transaction processing, merchant learning, budgets, and reports run locally on this device. Your data is only uploaded to your private Firebase account when you sign in and sync.",
+                        "All transaction processing, merchant learning, budgets, and reports run locally on this device. Your data is only uploaded to your private account when you sign in and sync.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -101,6 +101,7 @@ private class RecordingNotifier : Notifier {
     override fun createChannels() {}
     override fun showDetected(transactionId: Long, amountPaise: Long, merchant: String, source: String): Boolean = true
     override fun showReminder(transactionId: Long, title: String, body: String): Boolean = true
+    override fun showPendingReviewReminder(pendingCount: Int): Boolean = true
     override fun showTest(): Boolean = true
     override fun showBudgetAlert(category: Category, thresholdPercent: Int, spentPaise: Long, limitPaise: Long): Boolean {
         lastThreshold = thresholdPercent

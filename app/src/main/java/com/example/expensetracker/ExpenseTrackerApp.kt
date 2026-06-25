@@ -11,6 +11,7 @@ import com.example.expensetracker.domain.usecase.transaction.NotifyPendingUseCas
 import com.example.expensetracker.sync.DailyDigestWorker
 import com.example.expensetracker.sync.MonthlyReportWorker
 import com.example.expensetracker.sync.PendingNotificationWorker
+import com.example.expensetracker.sync.PendingReviewReminderWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,14 +54,24 @@ class ExpenseTrackerApp : Application(), Configuration.Provider {
     }
 
     private fun scheduleRecurringWork() {
-        val digestDelay = Duration.between(LocalDateTime.now(), nextNinePm()).toMillis().coerceAtLeast(0)
+        val ninePmDelay = Duration.between(LocalDateTime.now(), nextNinePm()).toMillis().coerceAtLeast(0)
+
         val digest = PeriodicWorkRequestBuilder<DailyDigestWorker>(24, TimeUnit.HOURS)
-            .setInitialDelay(digestDelay, TimeUnit.MILLISECONDS)
+            .setInitialDelay(ninePmDelay, TimeUnit.MILLISECONDS)
             .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "daily-expense-digest",
             ExistingPeriodicWorkPolicy.UPDATE,
             digest
+        )
+
+        val pendingReviewReminder = PeriodicWorkRequestBuilder<PendingReviewReminderWorker>(24, TimeUnit.HOURS)
+            .setInitialDelay(ninePmDelay, TimeUnit.MILLISECONDS)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            PendingReviewReminderWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            pendingReviewReminder
         )
 
         val monthly = PeriodicWorkRequestBuilder<MonthlyReportWorker>(1, TimeUnit.DAYS).build()
