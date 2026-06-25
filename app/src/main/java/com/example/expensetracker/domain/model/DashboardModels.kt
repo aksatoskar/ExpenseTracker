@@ -23,5 +23,7 @@ data class DashboardState(
 data class AnalyticsState(
     val categories: List<AmountByCategory> = emptyList(),
     val merchants: List<AmountByMerchant> = emptyList(),
-    val totalPaise: Long = 0
+    val totalPaise: Long = 0,
+    val trendPoints: List<Long> = emptyList(),
+    val trendLabels: List<String> = emptyList()
 )

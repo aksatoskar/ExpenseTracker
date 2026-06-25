@@ -26,7 +26,7 @@ class AnalyticsViewModel @Inject constructor(
     val selectedRange: StateFlow<String> = selected.asStateFlow()
 
     val analytics: StateFlow<AnalyticsState> = selected
-        .flatMapLatest { label -> observeAnalytics(rangeFor(label)) }
+        .flatMapLatest { label -> observeAnalytics(rangeFor(label), label) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AnalyticsState())
 
     fun setRange(label: String) { selected.value = label }
