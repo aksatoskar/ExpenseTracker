@@ -5,8 +5,10 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.example.expensetracker.domain.notification.Notifier
 import com.example.expensetracker.presentation.navigation.ExpenseApp
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * Single-activity host. Stays intentionally thin: it only wires Compose content and forwards the
@@ -14,12 +16,32 @@ import dagger.hilt.android.AndroidEntryPoint
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var notifier: Notifier
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val reviewId = intent.getLongExtra(EXTRA_REVIEW_ID, -1L)
+        val reviewId = consumeReviewIntent(intent)
         setContent {
-            ExpenseApp(startReviewId = reviewId.takeIf { it > 0 })
+            ExpenseApp(startReviewId = reviewId)
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeReviewIntent(intent)
+    }
+
+    /** Dismisses the detection notification and returns the transaction id to open, if any. */
+    private fun consumeReviewIntent(intent: Intent): Long? {
+        val reviewId = intent.getLongExtra(EXTRA_REVIEW_ID, -1L)
+        if (reviewId > 0) {
+            notifier.cancel(reviewId)
+            intent.removeExtra(EXTRA_REVIEW_ID)
+            return reviewId
+        }
+        return null
     }
 
     companion object {

@@ -60,6 +60,7 @@ class AndroidNotifier @Inject constructor(
         val remindIntent = Intent(context, NotificationActionReceiver::class.java)
             .setAction(NotificationActionReceiver.ACTION_REMIND_LATER)
             .putExtra(NotificationActionReceiver.EXTRA_TRANSACTION_ID, transactionId)
+            .putExtra(NotificationActionReceiver.EXTRA_REMIND_LATER, true)
 
         val notificationId = notificationIdFor(transactionId)
         val notification = NotificationCompat.Builder(context, DETECTED_CHANNEL)
