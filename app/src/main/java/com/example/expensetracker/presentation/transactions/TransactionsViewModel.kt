@@ -35,7 +35,9 @@ enum class TxnPeriod(val label: String) {
 /** Immutable snapshot of the filtered/sorted transactions list and the active filters. */
 data class TransactionsUiState(
     val transactions: List<TransactionEntity> = emptyList(),
+    val totalCount: Int = 0,
     val totalPaise: Long = 0,
+    val hasMore: Boolean = false,
     val query: String = "",
     val sort: TxnSort = TxnSort.DateNewest,
     val period: TxnPeriod = TxnPeriod.All,
@@ -51,42 +53,70 @@ class TransactionsViewModel @Inject constructor(
     private val sort = MutableStateFlow(TxnSort.DateNewest)
     private val period = MutableStateFlow(TxnPeriod.All)
     private val category = MutableStateFlow<Category?>(null)
+    private val page = MutableStateFlow(1)
 
     val uiState: StateFlow<TransactionsUiState> = combine(
-        transactionRepository.all,
-        query,
-        sort,
-        period,
-        category
-    ) { all, query, sort, period, category ->
-        val periodStart = periodStartMillis(period)
-        val filtered = all.asSequence()
-            .filter { it.merchant.contains(query, ignoreCase = true) }
-            .filter { period == TxnPeriod.All || it.timestamp >= periodStart }
-            .filter { category == null || it.category == category }
-            .toList()
-            .let { list ->
-                when (sort) {
-                    TxnSort.DateNewest -> list.sortedByDescending { it.timestamp }
-                    TxnSort.DateOldest -> list.sortedBy { it.timestamp }
-                    TxnSort.AmountHigh -> list.sortedByDescending { it.amountPaise }
-                    TxnSort.AmountLow -> list.sortedBy { it.amountPaise }
-                }
-            }
-        TransactionsUiState(
-            transactions = filtered,
+        combine(
+            transactionRepository.all,
+            query,
+            sort,
+            period,
+            category
+        ) { all, query, sort, period, category ->
+            val periodStart = periodStartMillis(period)
+            all.asSequence()
+                .filter { it.merchant.contains(query, ignoreCase = true) }
+                .filter { period == TxnPeriod.All || it.timestamp >= periodStart }
+                .filter { category == null || it.category == category }
+                .toList()
+                .let { list ->
+                    when (sort) {
+                        TxnSort.DateNewest -> list.sortedByDescending { it.timestamp }
+                        TxnSort.DateOldest -> list.sortedBy { it.timestamp }
+                        TxnSort.AmountHigh -> list.sortedByDescending { it.amountPaise }
+                        TxnSort.AmountLow -> list.sortedBy { it.amountPaise }
+                    }
+                } to TransactionsUiState(
+                    query = query,
+                    sort = sort,
+                    period = period,
+                    category = category
+                )
+        },
+        page
+    ) { (filtered, filters), page ->
+        val visibleLimit = page * PAGE_SIZE
+        filters.copy(
+            transactions = filtered.take(visibleLimit),
+            totalCount = filtered.size,
             totalPaise = filtered.sumOf { it.amountPaise },
-            query = query,
-            sort = sort,
-            period = period,
-            category = category
+            hasMore = filtered.size > visibleLimit
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionsUiState())
 
-    fun setQuery(value: String) { query.value = value }
-    fun setSort(value: TxnSort) { sort.value = value }
-    fun setPeriod(value: TxnPeriod) { period.value = value }
-    fun setCategory(value: Category?) { category.value = value }
+    fun setQuery(value: String) {
+        query.value = value
+        resetPage()
+    }
+
+    fun setSort(value: TxnSort) {
+        sort.value = value
+        resetPage()
+    }
+
+    fun setPeriod(value: TxnPeriod) {
+        period.value = value
+        resetPage()
+    }
+
+    fun setCategory(value: Category?) {
+        category.value = value
+        resetPage()
+    }
+
+    fun loadNextPage() {
+        if (uiState.value.hasMore) page.value++
+    }
 
     fun resetFilters() = applyNavFilters(TxnPeriod.All)
 
@@ -95,9 +125,16 @@ class TransactionsViewModel @Inject constructor(
         sort.value = TxnSort.DateNewest
         period.value = txnPeriod
         category.value = null
+        resetPage()
+    }
+
+    private fun resetPage() {
+        page.value = 1
     }
 
     private companion object {
+        const val PAGE_SIZE = 20
+
         fun periodStartMillis(period: TxnPeriod): Long {
             if (period == TxnPeriod.All) return Long.MIN_VALUE
             val today = LocalDate.now()

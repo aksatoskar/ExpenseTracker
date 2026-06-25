@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +23,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -41,13 +45,29 @@ fun TransactionsScreen(
 ) {
     val vm: TransactionsViewModel = hiltViewModel()
     val state by vm.uiState.collectAsState()
-    val result = state.transactions
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            if (!state.hasMore || state.transactions.isEmpty()) return@derivedStateOf false
+            val layoutInfo = listState.layoutInfo
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible >= layoutInfo.totalItemsCount - 3
+        }
+    }
 
     LaunchedEffect(navToken) {
         if (navToken > 0) vm.applyNavFilters(initialPeriod)
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) vm.loadNextPage()
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         item {
             Text("Transactions", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -103,7 +123,7 @@ fun TransactionsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "${result.size} ${if (result.size == 1) "transaction" else "transactions"}",
+                    "${state.totalCount} ${if (state.totalCount == 1) "transaction" else "transactions"}",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -115,7 +135,7 @@ fun TransactionsScreen(
                 )
             }
         }
-        if (result.isEmpty()) {
+        if (state.transactions.isEmpty()) {
             item {
                 Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
                     Text(
@@ -126,6 +146,18 @@ fun TransactionsScreen(
                 }
             }
         }
-        items(result) { TransactionRow(it, onClick = { openReview(it.id) }) }
+        items(state.transactions, key = { it.id }) { transaction ->
+            TransactionRow(transaction, onClick = { openReview(transaction.id) })
+        }
+        if (state.hasMore) {
+            item(key = "loading") {
+                Box(
+                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        }
     }
 }
