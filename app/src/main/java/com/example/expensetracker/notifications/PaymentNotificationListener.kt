@@ -4,10 +4,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.example.expensetracker.domain.crash.CrashReporter
 import com.example.expensetracker.domain.parser.NotificationTextExtractor
-import com.example.expensetracker.domain.parser.TransactionParser
-import com.example.expensetracker.domain.usecase.detection.RecordDetectedMessageUseCase
-import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
-import com.example.expensetracker.sync.IngestWorker
+import com.example.expensetracker.domain.usecase.detection.ProcessIncomingMessageUseCase
 import com.example.expensetracker.sync.PendingNotificationWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -16,14 +13,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Listens to payment notifications, records parsed debits and ingests them. */
+/** Listens to payment notifications, classifies parsed debits and ingests only valid ones. */
 @AndroidEntryPoint
 class PaymentNotificationListener : NotificationListenerService() {
 
-    @Inject lateinit var ingestTransaction: IngestTransactionUseCase
-    @Inject lateinit var parser: TransactionParser
+    @Inject lateinit var processIncomingMessage: ProcessIncomingMessageUseCase
     @Inject lateinit var crashReporter: CrashReporter
-    @Inject lateinit var recordDetectedMessage: RecordDetectedMessageUseCase
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -38,15 +33,16 @@ class PaymentNotificationListener : NotificationListenerService() {
         val text = NotificationTextExtractor.extract(sbn.notification.extras)
         if (text.isBlank()) return
 
-        val parsed = parser.parse(text, "Notification", sbn.postTime) ?: return
-        val appContext = applicationContext
         scope.launch {
             try {
-                recordDetectedMessage(parsed, sbn.packageName)
-                ingestTransaction(parsed)
+                processIncomingMessage(
+                    text = text,
+                    source = "Notification",
+                    timestamp = sbn.postTime,
+                    notificationPackage = sbn.packageName
+                )
             } catch (e: Exception) {
                 crashReporter.recordNonFatal(e)
-                IngestWorker.enqueue(appContext, parsed)
             }
         }
     }

@@ -1,11 +1,10 @@
 package com.example.expensetracker.domain.usecase.sms
 
 import com.example.expensetracker.core.concurrency.DispatcherProvider
-import com.example.expensetracker.domain.parser.TransactionParser
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.repository.SmsRepository
-import com.example.expensetracker.domain.usecase.detection.RecordDetectedMessageUseCase
-import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
+import com.example.expensetracker.domain.usecase.detection.IncomingMessageOutcome
+import com.example.expensetracker.domain.usecase.detection.ProcessIncomingMessageUseCase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -21,9 +20,7 @@ import javax.inject.Inject
 class SyncSmsInboxUseCase @Inject constructor(
     private val smsRepository: SmsRepository,
     private val settingsRepository: SettingsRepository,
-    private val parser: TransactionParser,
-    private val ingestTransaction: IngestTransactionUseCase,
-    private val recordDetectedMessage: RecordDetectedMessageUseCase,
+    private val processIncomingMessage: ProcessIncomingMessageUseCase,
     private val dispatchers: DispatcherProvider
 ) {
     companion object {
@@ -40,9 +37,18 @@ class SyncSmsInboxUseCase @Inject constructor(
 
         var newCount = 0
         smsRepository.readSince(since).forEach { sms ->
-            val parsed = parser.parse(sms.body, "SMS", sms.timestamp) ?: return@forEach
-            recordDetectedMessage(parsed)
-            if (ingestTransaction(parsed)) newCount++
+            when (
+                processIncomingMessage(
+                    text = sms.body,
+                    source = "SMS",
+                    timestamp = sms.timestamp
+                )
+            ) {
+                IncomingMessageOutcome.Ingested -> newCount++
+                IncomingMessageOutcome.NotTransaction,
+                IncomingMessageOutcome.Duplicate,
+                is IncomingMessageOutcome.Rejected -> Unit
+            }
         }
         settingsRepository.setLastSmsSync(now)
         newCount

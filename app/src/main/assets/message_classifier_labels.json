@@ -1,0 +1,8 @@
+{
+  "labels": [
+    "valid_debit",
+    "spam",
+    "invalid"
+  ],
+  "hash_dim": 256
+}
