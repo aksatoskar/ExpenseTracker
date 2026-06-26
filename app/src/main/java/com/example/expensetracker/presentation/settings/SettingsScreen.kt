@@ -1,5 +1,8 @@
 package com.example.expensetracker.presentation.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -24,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.Button
@@ -48,7 +52,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -69,6 +75,8 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
     val lastCloudSync by vm.lastCloudSync.collectAsState()
     val isCloudSyncing by vm.isCloudSyncing.collectAsState()
     val detectedMessageCount by vm.detectedMessageCount.collectAsState()
+    val installationId by vm.installationId.collectAsState()
+    val featureFlags by vm.featureFlags.collectAsState()
     var refreshKey by remember { mutableIntStateOf(0) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -119,128 +127,132 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
                 }
             }
         }
-        item { SectionHeader("Account & Sync") }
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+        if (featureFlags.cloudSyncEnabled) {
+            item { SectionHeader("Account & Sync") }
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            if (currentUser != null) Icons.Default.CloudDone else Icons.Default.CloudSync,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
-                            val user = currentUser
-                            if (user != null) {
-                                Text(user.displayName ?: "Signed in", fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    user.email ?: "Google account",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            } else {
-                                Text("Back up & sync", fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "Sign in with Google to sync your data across devices",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                    Column(
+                        Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (currentUser != null) Icons.Default.CloudDone else Icons.Default.CloudSync,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                val user = currentUser
+                                if (user != null) {
+                                    Text(user.displayName ?: "Signed in", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        user.email ?: "Google account",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else {
+                                    Text("Back up & sync", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "Sign in with Google to sync your data across devices",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    if (currentUser == null) {
-                        Button(
-                            onClick = {
-                                (context as? Activity)?.let { activity ->
-                                    vm.signIn(activity) { msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) { Text("Sign in with Google") }
-                    } else {
-                        Text(
-                            "Last synced: ${syncTimeText(lastCloudSync)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Column(
-                            Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
+                        if (currentUser == null) {
                             Button(
                                 onClick = {
-                                    vm.cloudSyncNow { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() }
+                                    (context as? Activity)?.let { activity ->
+                                        vm.signIn(activity) { msg ->
+                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 },
-                                enabled = !isCloudSyncing,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp)
+                            ) { Text("Sign in with Google") }
+                        } else {
+                            Text(
+                                "Last synced: ${syncTimeText(lastCloudSync)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Column(
+                                Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                if (isCloudSyncing) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Syncing...")
-                                } else {
-                                    Text("Sync now")
+                                Button(
+                                    onClick = {
+                                        vm.cloudSyncNow { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() }
+                                    },
+                                    enabled = !isCloudSyncing,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    if (isCloudSyncing) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Syncing...")
+                                    } else {
+                                        Text("Sync now")
+                                    }
                                 }
+                                TextButton(
+                                    onClick = { vm.signOut() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentPadding = PaddingValues(vertical = 0.dp)
+                                ) { Text("Sign out") }
                             }
-                            TextButton(
-                                onClick = { vm.signOut() },
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(vertical = 0.dp)
-                            ) { Text("Sign out") }
                         }
                     }
                 }
             }
         }
         item { SectionHeader("Detection Reliability") }
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                onClick = onOpenDetectedMessages
-            ) {
-                Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.ReceiptLong,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Detected messages", fontWeight = FontWeight.SemiBold)
+        if (featureFlags.detectedMessagesEnabled) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    onClick = onOpenDetectedMessages
+                ) {
+                    Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.ReceiptLong,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Detected messages", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (detectedMessageCount == 0) {
+                                    "SMS & notifications parsed as debit transactions"
+                                } else {
+                                    "$detectedMessageCount stored message${if (detectedMessageCount == 1) "" else "s"}"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Text(
-                            if (detectedMessageCount == 0) {
-                                "SMS & notifications parsed as debit transactions"
-                            } else {
-                                "$detectedMessageCount stored message${if (detectedMessageCount == 1) "" else "s"}"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            "View",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
                         )
                     }
-                    Text(
-                        "View",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    )
                 }
             }
         }
@@ -308,6 +320,53 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
                 actionLabel = "Disable",
                 onAction = { context.startActivity(PermissionHelper.batteryOptimizationIntent(context)) }
             )
+        }
+        item { SectionHeader("Device") }
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Installation ID", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Unique to this install. Used for analytics and feature rollouts.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Text(
+                        installationId ?: "Loading…",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (installationId != null) {
+                        TextButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Installation ID", installationId))
+                                Toast.makeText(context, "Installation ID copied", Toast.LENGTH_SHORT).show()
+                            },
+                            contentPadding = PaddingValues(vertical = 0.dp)
+                        ) { Text("Copy ID") }
+                    }
+                }
+            }
         }
         item { SectionHeader("Privacy") }
         item {

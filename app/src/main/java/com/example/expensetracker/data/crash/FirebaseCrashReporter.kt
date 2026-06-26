@@ -22,4 +22,8 @@ class FirebaseCrashReporter @Inject constructor() : CrashReporter {
     override fun setKey(key: String, value: String) {
         crashlytics.setCustomKey(key, value)
     }
+
+    override fun setUserId(userId: String) {
+        crashlytics.setUserId(userId)
+    }
 }

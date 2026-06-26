@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.expensetracker.domain.analytics.AnalyticsEvent
 import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.auth.AuthRepository
+import com.example.expensetracker.domain.repository.FeatureFlagsRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.usecase.budget.RenewBudgetsUseCase
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
@@ -35,7 +36,8 @@ class AppViewModel @Inject constructor(
     private val renewBudgets: RenewBudgetsUseCase,
     private val analytics: AnalyticsTracker,
     private val authRepository: AuthRepository,
-    private val syncData: SyncDataUseCase
+    private val syncData: SyncDataUseCase,
+    private val featureFlagsRepository: FeatureFlagsRepository
 ) : ViewModel() {
 
     val uiState: StateFlow<AppUiState> = combine(
@@ -48,8 +50,9 @@ class AppViewModel @Inject constructor(
     /** True only while a signed-in user has not yet been shown the one-time post-login sync prompt. */
     val showSyncPrompt: StateFlow<Boolean> = combine(
         authRepository.currentUser,
-        settingsRepository.syncPromptShown
-    ) { user, shown -> user != null && !shown }
+        settingsRepository.syncPromptShown,
+        featureFlagsRepository.featureFlags
+    ) { user, shown, flags -> user != null && !shown && flags.cloudSyncEnabled }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private var startupTriggered = false

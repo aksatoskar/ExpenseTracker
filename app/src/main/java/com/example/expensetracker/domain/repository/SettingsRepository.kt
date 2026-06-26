@@ -10,6 +10,7 @@ interface SettingsRepository {
     val lastBudgetArchiveMonth: Flow<String?>
     val lastCloudSync: Flow<Long>
     val syncPromptShown: Flow<Boolean>
+    val installationId: Flow<String?>
 
     suspend fun setOnboardingComplete(complete: Boolean)
     suspend fun setDarkTheme(enabled: Boolean)
@@ -17,6 +18,7 @@ interface SettingsRepository {
     suspend fun setLastBudgetArchiveMonth(yearMonth: String)
     suspend fun setLastCloudSync(millis: Long)
     suspend fun setSyncPromptShown(shown: Boolean)
+    suspend fun setInstallationId(id: String)
 
     /**
      * Returns the SMS-sync baseline: the earliest timestamp this install will scan from. Set once

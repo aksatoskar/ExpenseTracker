@@ -17,4 +17,7 @@ interface CrashReporter {
 
     /** Sets a custom key/value pair attached to subsequent reports. */
     fun setKey(key: String, value: String)
+
+    /** Associates crash reports with this app installation. */
+    fun setUserId(userId: String)
 }

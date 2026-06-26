@@ -28,6 +28,11 @@ class FirebaseAnalyticsTracker @Inject constructor(
         analytics.logEvent(event.name, event.params.toBundle())
     }
 
+    override fun setInstallationId(installationId: String) {
+        analytics.setUserId(installationId)
+        analytics.setUserProperty("installation_id", installationId)
+    }
+
     private fun Map<String, Any>.toBundle(): Bundle = Bundle().apply {
         forEach { (key, value) ->
             when (value) {

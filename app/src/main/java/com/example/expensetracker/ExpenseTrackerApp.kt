@@ -8,6 +8,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.expensetracker.domain.notification.Notifier
 import com.example.expensetracker.domain.usecase.transaction.NotifyPendingUseCase
+import com.example.expensetracker.domain.usecase.identity.InitializeAppIdentityUseCase
 import com.example.expensetracker.sync.DailyDigestWorker
 import com.example.expensetracker.sync.MonthlyReportWorker
 import com.example.expensetracker.sync.PendingNotificationWorker
@@ -33,6 +34,7 @@ class ExpenseTrackerApp : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var notifier: Notifier
     @Inject lateinit var notifyPending: NotifyPendingUseCase
+    @Inject lateinit var initializeAppIdentity: InitializeAppIdentityUseCase
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -46,6 +48,7 @@ class ExpenseTrackerApp : Application(), Configuration.Provider {
         notifier.createChannels()
         scheduleRecurringWork()
         recoverMissedNotifications()
+        appScope.launch { runCatching { initializeAppIdentity() } }
     }
 
     private fun recoverMissedNotifications() {

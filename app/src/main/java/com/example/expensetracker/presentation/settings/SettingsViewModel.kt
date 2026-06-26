@@ -9,7 +9,10 @@ import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.auth.AuthRepository
 import com.example.expensetracker.domain.auth.AuthUser
 import com.example.expensetracker.domain.notification.Notifier
+import com.example.expensetracker.domain.feature.FeatureFlags
 import com.example.expensetracker.domain.repository.DetectedMessageRepository
+import com.example.expensetracker.domain.repository.FeatureFlagsRepository
+import com.example.expensetracker.domain.repository.InstallationIdRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
 import com.example.expensetracker.domain.usecase.sync.SyncDataUseCase
@@ -36,8 +39,20 @@ class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val googleCredentialClient: GoogleCredentialClient,
     private val syncData: SyncDataUseCase,
+    private val installationIdRepository: InstallationIdRepository,
+    private val featureFlagsRepository: FeatureFlagsRepository,
     detectedMessageRepository: DetectedMessageRepository
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch { runCatching { featureFlagsRepository.refresh() } }
+    }
+
+    val installationId: StateFlow<String?> =
+        installationIdRepository.installationId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val featureFlags: StateFlow<FeatureFlags> =
+        featureFlagsRepository.featureFlags.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FeatureFlags())
 
     val detectedMessageCount: StateFlow<Int> =
         detectedMessageRepository.count.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)

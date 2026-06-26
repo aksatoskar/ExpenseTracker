@@ -13,4 +13,7 @@ interface AnalyticsTracker {
 
     /** Logs a typed product [event]. */
     fun log(event: AnalyticsEvent)
+
+    /** Associates analytics with this app installation for filtering and segmentation. */
+    fun setInstallationId(installationId: String)
 }

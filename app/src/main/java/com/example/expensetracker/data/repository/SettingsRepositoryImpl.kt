@@ -59,6 +59,9 @@ class SettingsRepositoryImpl @Inject constructor(
     override val syncPromptShown: Flow<Boolean> =
         store.data.map { it[KEY_SYNC_PROMPT_SHOWN] ?: false }
 
+    override val installationId: Flow<String?> =
+        store.data.map { it[KEY_INSTALLATION_ID] }
+
     override suspend fun setOnboardingComplete(complete: Boolean) {
         store.edit { it[KEY_ONBOARDING] = complete }
     }
@@ -83,6 +86,10 @@ class SettingsRepositoryImpl @Inject constructor(
         store.edit { it[KEY_SYNC_PROMPT_SHOWN] = shown }
     }
 
+    override suspend fun setInstallationId(id: String) {
+        store.edit { it[KEY_INSTALLATION_ID] = id }
+    }
+
     override suspend fun ensureSmsSyncBaseline(now: Long): Long {
         val prefs = store.edit { if (it[KEY_SMS_BASELINE] == null) it[KEY_SMS_BASELINE] = now }
         return prefs[KEY_SMS_BASELINE] ?: now
@@ -96,5 +103,6 @@ class SettingsRepositoryImpl @Inject constructor(
         val KEY_LAST_CLOUD_SYNC = longPreferencesKey("last_cloud_sync")
         val KEY_SYNC_PROMPT_SHOWN = booleanPreferencesKey("sync_prompt_shown")
         val KEY_SMS_BASELINE = longPreferencesKey("sms_sync_baseline")
+        val KEY_INSTALLATION_ID = stringPreferencesKey("firebase_installation_id")
     }
 }
