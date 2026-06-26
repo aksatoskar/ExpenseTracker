@@ -1,8 +1,14 @@
 {
   "labels": [
-    "valid_debit",
-    "spam",
-    "invalid"
+    "actual_debit",
+    "future_debit",
+    "credit",
+    "receipt",
+    "otp",
+    "reward_cashback",
+    "phishing_spam",
+    "unknown"
   ],
-  "hash_dim": 256
+  "hash_dim": 1024,
+  "num_classes": 8
 }

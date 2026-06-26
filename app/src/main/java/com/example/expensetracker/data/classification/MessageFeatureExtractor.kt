@@ -6,8 +6,11 @@ import java.util.regex.Pattern
 import javax.inject.Inject
 import kotlin.math.abs
 
-/** Builds the same hashed bag-of-words vector used to train [message_classifier.tflite]. */
+/** Builds the hashed bag-of-words vector for [message_classifier.tflite] (sender + body). */
 class MessageFeatureExtractor @Inject constructor() {
+
+    fun featurize(input: MessageClassificationInput): FloatArray =
+        featurize(ClassificationTextBuilder.build(input))
 
     fun featurize(text: String): FloatArray {
         val vector = FloatArray(HASH_DIM)
@@ -22,8 +25,6 @@ class MessageFeatureExtractor @Inject constructor() {
         return vector
     }
 
-    fun featurize(input: MessageClassificationInput): FloatArray = featurize(input.rawText)
-
     private fun normalize(vector: FloatArray) {
         var sumSquares = 0f
         for (value in vector) {
@@ -37,7 +38,7 @@ class MessageFeatureExtractor @Inject constructor() {
     }
 
     companion object {
-        const val HASH_DIM = 256
+        const val HASH_DIM = 1024
         private val TOKEN_PATTERN = Pattern.compile("[a-z0-9]+")
     }
 }

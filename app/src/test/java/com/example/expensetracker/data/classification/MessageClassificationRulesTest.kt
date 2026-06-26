@@ -1,31 +1,34 @@
 package com.example.expensetracker.data.classification
 
 import com.example.expensetracker.domain.classification.MessageClassificationInput
-import com.example.expensetracker.domain.classification.MessageLabel
+import com.example.expensetracker.domain.classification.MessageType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageClassificationRulesTest {
     private val rules = MessageClassificationRules()
 
     @Test
-    fun rejectsFederalBankPhishingSms() {
-        val receivedAt = java.time.LocalDate.of(2026, 6, 25)
+    fun acceptsFederalBankDebitSmsWithStandardSecurityFooter() {
+        val receivedAt = java.time.LocalDate.of(2026, 6, 27)
             .atStartOfDay(java.time.ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
 
         val result = rules.evaluate(
             MessageClassificationInput(
-                rawText = "Debited Rs 6.00 from a/c X2685 on 25Jun26 23:59 via UPI to aksatoskar-1. " +
-                    "Ref 617625008733.Bal Rs 11662.38. Not you?Call 18004251199 -Federal Bank",
+                rawText = "Debited Rs 2.00 from a/c X2225 on 27Jun26 00:20 via UPI to aksatoskar-1. " +
+                    "Ref 617817479920.Bal Rs 11660.38. Not you?Call 18004251199 -Federal Bank",
                 source = "SMS",
                 receivedAtMillis = receivedAt,
                 sender = "VA-FEDBNK-T"
             )
         )
 
-        assertEquals(MessageLabel.Spam, result?.label)
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= 80)
     }
 
     @Test
@@ -40,7 +43,7 @@ class MessageClassificationRulesTest {
             )
         )
 
-        assertEquals(MessageLabel.Invalid, result?.label)
+        assertEquals(MessageType.Unknown, result?.type)
     }
 
     @Test
@@ -54,11 +57,12 @@ class MessageClassificationRulesTest {
             MessageClassificationInput(
                 rawText = "Debited Rs.6.00 From HDFC Bank A/C *4915 To MERCHANT On 25/06/26 Ref 654207042327",
                 source = "SMS",
-                receivedAtMillis = receivedAt
+                receivedAtMillis = receivedAt,
+                sender = "AD-HDFCBK-S"
             )
         )
 
-        assertEquals(MessageLabel.Invalid, result?.label)
+        assertEquals(MessageType.FutureDebit, result?.type)
     }
 
     @Test
@@ -71,61 +75,117 @@ class MessageClassificationRulesTest {
             )
         )
 
-        assertEquals(MessageLabel.Invalid, result?.label)
-        assertEquals("upcoming_payment", result?.reason)
+        assertEquals(MessageType.FutureDebit, result?.type)
     }
 
     @Test
-    fun rejectsPurchaseReceiptKeywords() {
+    fun rejectsPharmacyReceiptWithSender() {
         val result = rules.evaluate(
             MessageClassificationInput(
                 rawText = "Thank you for your purchase of Rs 450. Download your bill from the app.",
                 source = "SMS",
-                receivedAtMillis = System.currentTimeMillis()
+                receivedAtMillis = System.currentTimeMillis(),
+                sender = "AX-APLPHR-S"
             )
         )
 
-        assertEquals(MessageLabel.Invalid, result?.label)
+        assertEquals(MessageType.Receipt, result?.type)
     }
 
     @Test
-    fun rejectsWeakDebitWithoutStrongKeyword() {
-        val result = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Rs.450 paid to Swiggy via UPI ref 12345",
-                source = "SMS",
-                receivedAtMillis = System.currentTimeMillis()
-            )
-        )
-
-        assertEquals(MessageLabel.Invalid, result?.label)
-        assertEquals("missing_strong_debit_keyword", result?.reason)
-    }
-
-    @Test
-    fun allowsTypicalDebitSmsWithStrongKeyword() {
+    fun acceptsHdfcDebitWithTrustedSender() {
         val result = rules.evaluate(
             MessageClassificationInput(
                 rawText = "Txn successful. INR 99 debited from A/c XX1234 on 20-Jun-25",
                 source = "SMS",
-                receivedAtMillis = System.currentTimeMillis()
+                receivedAtMillis = System.currentTimeMillis(),
+                sender = "AD-HDFCBK-S"
             )
         )
 
-        assertEquals(null, result)
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= 80)
     }
 
     @Test
-    fun rejectsDebitMessageThatAlsoContainsInvoiceKeyword() {
+    fun acceptsSpentOnCardMessage() {
         val result = rules.evaluate(
             MessageClassificationInput(
-                rawText = "Rs 500 debited for tax invoice payment to MERCHANT",
+                rawText = "Spent Rs.1730.43 on Debit Card ending 4567 at AMAZON",
+                source = "SMS",
+                receivedAtMillis = System.currentTimeMillis(),
+                sender = "VK-AXISBK-S"
+            )
+        )
+
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= 80)
+    }
+
+    @Test
+    fun acceptsExecutedStandingInstruction() {
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "Standing instruction executed. Rs.1500 debited",
+                source = "SMS",
+                receivedAtMillis = System.currentTimeMillis(),
+                sender = "AD-HDFCBK-S"
+            )
+        )
+
+        assertEquals(MessageType.ActualDebit, result?.type)
+    }
+
+    @Test
+    fun defersWeakDebitToMl() {
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "Rs.450 paid to Swiggy ref 12345",
                 source = "SMS",
                 receivedAtMillis = System.currentTimeMillis()
             )
         )
 
-        assertEquals(MessageLabel.Invalid, result?.label)
-        assertEquals("purchase_receipt", result?.reason)
+        assertNull(result)
+    }
+
+    @Test
+    fun rejectsOtpMessage() {
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "OTP 123456 for transaction of Rs 500",
+                source = "SMS",
+                receivedAtMillis = System.currentTimeMillis()
+            )
+        )
+
+        assertEquals(MessageType.Otp, result?.type)
+    }
+
+    @Test
+    fun rejectsCreditMessage() {
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "Salary of Rs 55000 credited",
+                source = "SMS",
+                receivedAtMillis = System.currentTimeMillis()
+            )
+        )
+
+        assertEquals(MessageType.Credit, result?.type)
+    }
+
+    @Test
+    fun rejectsBitLyPhishingEvenWithDebitKeyword() {
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "Federal Bank alert: unusual activity. Update PAN at bit.ly/fake-link",
+                source = "SMS",
+                receivedAtMillis = System.currentTimeMillis(),
+                sender = "VA-FEDBNK-T"
+            )
+        )
+
+        assertEquals(MessageType.PhishingSpam, result?.type)
     }
 }

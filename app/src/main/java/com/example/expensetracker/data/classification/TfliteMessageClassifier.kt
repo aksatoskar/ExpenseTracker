@@ -3,7 +3,7 @@ package com.example.expensetracker.data.classification
 import android.content.Context
 import com.example.expensetracker.domain.classification.MessageClassificationInput
 import com.example.expensetracker.domain.classification.MessageClassificationResult
-import com.example.expensetracker.domain.classification.MessageLabel
+import com.example.expensetracker.domain.classification.MessageType
 import com.example.expensetracker.domain.classification.TransactionMessageClassifier
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tensorflow.lite.Interpreter
@@ -11,6 +11,11 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Rules-first classifier with TFLite fallback for ambiguous messages (~10–15%).
+ * Notifications fire only for [MessageType.ActualDebit] with confidence ≥ 80.
+ */
 @Singleton
 class TfliteMessageClassifier @Inject constructor(
     @ApplicationContext context: Context,
@@ -24,8 +29,8 @@ class TfliteMessageClassifier @Inject constructor(
         rules.evaluate(input)?.let { return it }
 
         val interpreter = interpreter ?: return MessageClassificationResult(
-            label = MessageLabel.ValidDebit,
-            confidence = 0f,
+            type = MessageType.Unknown,
+            confidence = 0,
             reason = "model_unavailable"
         )
 
@@ -34,21 +39,25 @@ class TfliteMessageClassifier @Inject constructor(
         interpreter.run(toInputBuffer(features), output)
 
         val scores = output[0]
-        val bestIndex = scores.indices.maxByOrNull(scores::get) ?: 0
-        val label = INDEX_TO_LABEL[bestIndex] ?: MessageLabel.ValidDebit
-        val confidence = scores[bestIndex]
+        val bestIndex = scores.indices.maxByOrNull(scores::get) ?: NUM_CLASSES - 1
+        val type = INDEX_TO_TYPE[bestIndex] ?: MessageType.Unknown
+        val confidence = (scores[bestIndex] * 100f).toInt().coerceIn(0, 100)
 
-        if (label == MessageLabel.ValidDebit && confidence < MIN_VALID_CONFIDENCE) {
+        if (type == MessageType.ActualDebit && confidence < MessageClassificationResult.NOTIFY_THRESHOLD) {
             val runnerUpIndex = scores.indices.filter { it != bestIndex }.maxByOrNull(scores::get) ?: bestIndex
-            val runnerUpLabel = INDEX_TO_LABEL[runnerUpIndex] ?: MessageLabel.Spam
+            val runnerUpType = INDEX_TO_TYPE[runnerUpIndex] ?: MessageType.Unknown
             return MessageClassificationResult(
-                label = runnerUpLabel,
-                confidence = scores[runnerUpIndex],
-                reason = "low_valid_confidence"
+                type = runnerUpType,
+                confidence = (scores[runnerUpIndex] * 100f).toInt().coerceIn(0, 100),
+                reason = "ml_low_actual_debit_confidence"
             )
         }
 
-        return MessageClassificationResult(label = label, confidence = confidence)
+        return MessageClassificationResult(
+            type = type,
+            confidence = confidence,
+            reason = "ml_classifier"
+        )
     }
 
     private fun toInputBuffer(features: FloatArray): ByteBuffer =
@@ -61,13 +70,17 @@ class TfliteMessageClassifier @Inject constructor(
 
     companion object {
         private const val MODEL_ASSET = "message_classifier.tflite"
-        private const val NUM_CLASSES = 3
-        private const val MIN_VALID_CONFIDENCE = 0.55f
+        private const val NUM_CLASSES = 8
 
-        private val INDEX_TO_LABEL = mapOf(
-            0 to MessageLabel.ValidDebit,
-            1 to MessageLabel.Spam,
-            2 to MessageLabel.Invalid
+        private val INDEX_TO_TYPE = mapOf(
+            0 to MessageType.ActualDebit,
+            1 to MessageType.FutureDebit,
+            2 to MessageType.Credit,
+            3 to MessageType.Receipt,
+            4 to MessageType.Otp,
+            5 to MessageType.RewardCashback,
+            6 to MessageType.PhishingSpam,
+            7 to MessageType.Unknown
         )
 
         private fun loadInterpreter(context: Context): Interpreter? = try {

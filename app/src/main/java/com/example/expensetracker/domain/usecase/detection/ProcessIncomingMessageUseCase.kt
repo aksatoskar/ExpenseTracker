@@ -2,7 +2,6 @@ package com.example.expensetracker.domain.usecase.detection
 
 import com.example.expensetracker.domain.classification.MessageClassificationInput
 import com.example.expensetracker.domain.classification.MessageClassificationResult
-import com.example.expensetracker.domain.classification.MessageLabel
 import com.example.expensetracker.domain.parser.TransactionParser
 import com.example.expensetracker.domain.usecase.transaction.IngestTransactionUseCase
 import javax.inject.Inject
@@ -32,7 +31,7 @@ class ProcessIncomingMessageUseCase @Inject constructor(
                 notificationPackage = notificationPackage
             )
         )
-        if (classification.label != MessageLabel.ValidDebit) {
+        if (!classification.shouldNotify) {
             return IncomingMessageOutcome.Rejected(classification)
         }
 
