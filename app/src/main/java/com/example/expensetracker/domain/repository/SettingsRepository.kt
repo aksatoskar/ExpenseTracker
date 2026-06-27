@@ -7,6 +7,7 @@ interface SettingsRepository {
     val onboardingComplete: Flow<Boolean>
     val darkTheme: Flow<Boolean>
     val lastSmsSync: Flow<Long>
+    val smsSyncBaseline: Flow<Long?>
     val lastBudgetArchiveMonth: Flow<String?>
     val lastCloudSync: Flow<Long>
     val syncPromptShown: Flow<Boolean>

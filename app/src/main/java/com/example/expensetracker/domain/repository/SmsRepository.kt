@@ -9,4 +9,7 @@ interface SmsRepository {
 
     /** Returns inbox messages after [sinceMillis]; [inclusive] includes messages at exactly [sinceMillis]. */
     fun readSince(sinceMillis: Long, inclusive: Boolean = false): List<RawSms>
+
+    /** Returns inbox messages with [startMillis] <= date <= [endMillis], oldest first. */
+    fun readBetween(startMillis: Long, endMillis: Long): List<RawSms>
 }

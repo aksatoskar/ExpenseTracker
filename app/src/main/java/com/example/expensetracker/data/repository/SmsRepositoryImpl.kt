@@ -20,4 +20,7 @@ class SmsRepositoryImpl @Inject constructor(
 
     override fun readSince(sinceMillis: Long, inclusive: Boolean): List<RawSms> =
         smsReader.readSince(sinceMillis, inclusive = inclusive)
+
+    override fun readBetween(startMillis: Long, endMillis: Long): List<RawSms> =
+        smsReader.readBetween(startMillis, endMillis)
 }

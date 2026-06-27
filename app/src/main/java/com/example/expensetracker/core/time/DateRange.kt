@@ -42,5 +42,12 @@ data class DateRange(val startMillis: Long, val endMillis: Long) {
             val end = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
             return DateRange(start, end)
         }
+
+        fun between(from: LocalDate, to: LocalDate): DateRange {
+            require(!from.isAfter(to)) { "from must be on or before to" }
+            val start = from.atStartOfDay(zone).toInstant().toEpochMilli()
+            val end = to.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+            return DateRange(start, end)
+        }
     }
 }

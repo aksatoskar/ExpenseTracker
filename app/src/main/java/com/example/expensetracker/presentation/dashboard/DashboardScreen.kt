@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.MoneyOff
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
@@ -34,11 +35,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.expensetracker.core.money.formatInr
@@ -62,7 +68,9 @@ import com.example.expensetracker.presentation.common.TransactionRow
 import com.example.expensetracker.presentation.common.categoryColor
 import com.example.expensetracker.presentation.common.categoryIcon
 import com.example.expensetracker.presentation.common.syncTimeText
+import com.example.expensetracker.presentation.settings.CustomSmsSyncDialog
 import com.example.expensetracker.presentation.settings.SettingsViewModel
+import com.example.expensetracker.presentation.settings.smsSyncResultMessage
 import com.example.expensetracker.presentation.transactions.TxnPeriod
 
 /** Home tab: spending hero, priority breakdown, smart insights and recent transactions. */
@@ -172,42 +180,115 @@ private fun SyncStatusCard() {
     val settingsVm: SettingsViewModel = hiltViewModel()
     val lastSync by settingsVm.lastSmsSync.collectAsState()
     val syncing by settingsVm.isSyncing.collectAsState()
+    val smsSyncMinDate by settingsVm.smsSyncMinDate.collectAsState()
+    var showCustomSync by remember { mutableStateOf(false) }
+
+    if (showCustomSync) {
+        CustomSmsSyncDialog(
+            minSelectableDate = smsSyncMinDate,
+            onDismiss = { showCustomSync = false },
+            onConfirm = { from, to ->
+                showCustomSync = false
+                settingsVm.syncCustom(from, to) { count ->
+                    Toast.makeText(context, smsSyncResultMessage(count), Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Row(
-            Modifier.padding(14.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(Modifier.weight(1f)) {
-                Text("SMS Sync", fontWeight = FontWeight.SemiBold)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Sms,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "SMS Sync",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Last synced",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                        Text(
+                            " · ${syncTimeText(lastSync)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (syncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            if (!syncing) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showCustomSync = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Custom range", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Button(
+                        onClick = {
+                            settingsVm.syncToday { count ->
+                                Toast.makeText(context, smsSyncResultMessage(count), Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Sync today", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            } else {
                 Text(
-                    "Last synced: ${syncTimeText(lastSync)}",
+                    "Scanning inbox…",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            if (syncing) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-            } else {
-                Button(
-                    onClick = {
-                        settingsVm.syncNow { count ->
-                            val message = when {
-                                count < 0 -> "Enable SMS access to sync"
-                                count == 0 -> "No new transactions found"
-                                count == 1 -> "1 new transaction added to review"
-                                else -> "$count new transactions added to review"
-                            }
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Sync now")
-                }
             }
         }
     }

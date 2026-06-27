@@ -14,6 +14,7 @@ import com.example.expensetracker.domain.repository.DetectedMessageRepository
 import com.example.expensetracker.domain.repository.FeatureFlagsRepository
 import com.example.expensetracker.domain.repository.InstallationIdRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
+import com.example.expensetracker.core.time.DateRange
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
 import com.example.expensetracker.domain.usecase.sync.SyncDataUseCase
 import com.example.expensetracker.domain.usecase.sync.SyncOutcome
@@ -23,7 +24,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 /**
@@ -45,7 +50,10 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     init {
-        viewModelScope.launch { runCatching { featureFlagsRepository.refresh() } }
+        viewModelScope.launch {
+            runCatching { featureFlagsRepository.refresh() }
+            settingsRepository.ensureSmsSyncBaseline(System.currentTimeMillis())
+        }
     }
 
     val installationId: StateFlow<String?> =
@@ -63,6 +71,15 @@ class SettingsViewModel @Inject constructor(
     val lastSmsSync: StateFlow<Long> =
         settingsRepository.lastSmsSync.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
+    /** Earliest calendar date the user can pick for custom SMS sync (app install day). */
+    val smsSyncMinDate: StateFlow<LocalDate> =
+        settingsRepository.smsSyncBaseline
+            .map { baselineMillis ->
+                val millis = baselineMillis ?: System.currentTimeMillis()
+                Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalDate.now())
+
     val currentUser: StateFlow<AuthUser?> =
         authRepository.currentUser.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), authRepository.currentUserOrNull())
 
@@ -79,12 +96,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setDarkTheme(enabled) }
     }
 
-    /** Runs an SMS sync; [onResult] receives the new-transaction count (or -1 if not permitted). */
-    fun syncNow(onResult: (Int) -> Unit) {
+    /** Syncs today's SMS inbox. [onResult] receives the new-transaction count (or -1 if not permitted). */
+    fun syncToday(onResult: (Int) -> Unit) = syncSms(DateRange.today(), onResult)
+
+    /** Syncs SMS for an inclusive custom date range. */
+    fun syncCustom(from: LocalDate, to: LocalDate, onResult: (Int) -> Unit) =
+        syncSms(DateRange.between(from, to), onResult)
+
+    private fun syncSms(range: DateRange, onResult: (Int) -> Unit) {
         if (_isSyncing.value) return
         _isSyncing.value = true
         viewModelScope.launch {
-            val count = runCatching { syncSmsInbox(rescanFromBaseline = true) }.getOrDefault(0)
+            val count = runCatching { syncSmsInbox(range) }.getOrDefault(0)
             if (count >= 0) analytics.log(AnalyticsEvent.SmsSynced(count))
             _isSyncing.value = false
             onResult(count)
