@@ -2,6 +2,7 @@ package com.example.expensetracker.di
 
 import com.example.expensetracker.core.concurrency.DefaultDispatcherProvider
 import com.example.expensetracker.core.concurrency.DispatcherProvider
+import com.example.expensetracker.data.classification.FirebaseClassificationConfigRepository
 import com.example.expensetracker.data.feature.FirebaseFeatureFlagsRepository
 import com.example.expensetracker.data.identity.FirebaseInstallationIdRepository
 import com.example.expensetracker.data.notification.AndroidNotifier
@@ -13,6 +14,7 @@ import com.example.expensetracker.data.repository.TransactionRepositoryImpl
 import com.example.expensetracker.domain.notification.Notifier
 import com.example.expensetracker.domain.repository.BudgetRepository
 import com.example.expensetracker.domain.repository.DetectedMessageRepository
+import com.example.expensetracker.domain.repository.ClassificationConfigRepository
 import com.example.expensetracker.domain.repository.FeatureFlagsRepository
 import com.example.expensetracker.domain.repository.InstallationIdRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
@@ -56,6 +58,12 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindFeatureFlagsRepository(impl: FirebaseFeatureFlagsRepository): FeatureFlagsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindClassificationConfigRepository(
+        impl: FirebaseClassificationConfigRepository
+    ): ClassificationConfigRepository
 
     @Binds
     @Singleton

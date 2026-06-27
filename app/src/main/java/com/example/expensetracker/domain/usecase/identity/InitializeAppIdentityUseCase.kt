@@ -2,6 +2,7 @@ package com.example.expensetracker.domain.usecase.identity
 
 import com.example.expensetracker.domain.analytics.AnalyticsTracker
 import com.example.expensetracker.domain.crash.CrashReporter
+import com.example.expensetracker.domain.repository.ClassificationConfigRepository
 import com.example.expensetracker.domain.repository.FeatureFlagsRepository
 import com.example.expensetracker.domain.repository.InstallationIdRepository
 import javax.inject.Inject
@@ -13,6 +14,7 @@ import javax.inject.Inject
 class InitializeAppIdentityUseCase @Inject constructor(
     private val installationIdRepository: InstallationIdRepository,
     private val featureFlagsRepository: FeatureFlagsRepository,
+    private val classificationConfigRepository: ClassificationConfigRepository,
     private val analytics: AnalyticsTracker,
     private val crashReporter: CrashReporter
 ) {
@@ -22,5 +24,6 @@ class InitializeAppIdentityUseCase @Inject constructor(
         crashReporter.setUserId(installationId)
         crashReporter.setKey("installation_id", installationId)
         featureFlagsRepository.refresh()
+        classificationConfigRepository.refresh()
     }
 }

@@ -18,5 +18,6 @@ class SmsRepositoryImpl @Inject constructor(
 
     override fun canReadSms(): Boolean = PermissionHelper.hasReadSmsPermission(context)
 
-    override fun readSince(sinceMillis: Long): List<RawSms> = smsReader.readSince(sinceMillis)
+    override fun readSince(sinceMillis: Long, inclusive: Boolean): List<RawSms> =
+        smsReader.readSince(sinceMillis, inclusive = inclusive)
 }

@@ -3,6 +3,8 @@ package com.example.expensetracker.data.classification
 import com.example.expensetracker.domain.classification.MessageClassificationInput
 import com.example.expensetracker.domain.classification.MessageClassificationResult
 import com.example.expensetracker.domain.classification.MessageType
+import com.example.expensetracker.domain.classification.CompiledClassificationRules
+import com.example.expensetracker.domain.repository.ClassificationConfigRepository
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -13,49 +15,53 @@ import java.util.regex.Pattern
 import javax.inject.Inject
 
 /**
- * Layered rule engine (Stages 1–5, 8). Returns a definitive result for ~85–90% of messages;
- * returns `null` when confidence is ambiguous so [TfliteMessageClassifier] can decide.
+ * Layered rule engine driven by [ClassificationConfigRepository] (Remote Config + bundled fallback).
  */
-class MessageClassificationRules @Inject constructor() {
+class MessageClassificationRules @Inject constructor(
+    private val configRepository: ClassificationConfigRepository,
+    private val senderValidator: SenderValidator
+) {
 
-    /**
-     * @return A high-confidence classification, or `null` to defer to the ML fallback.
-     */
+    private val rules: CompiledClassificationRules
+        get() = configRepository.current()
+
     fun evaluate(input: MessageClassificationInput): MessageClassificationResult? {
+        val compiled = rules
+        val cfg = compiled.config
         val lower = input.rawText.lowercase(Locale.US)
         val sender = input.sender ?: input.notificationPackage
 
-        if (OTP_PATTERN.containsMatchIn(lower)) {
+        if (compiled.otpPattern.containsMatchIn(lower)) {
             return result(MessageType.Otp, 98, "otp")
         }
-        if (PHISHING_PATTERN.containsMatchIn(lower)) {
+        if (compiled.phishingPattern.containsMatchIn(lower)) {
             return result(MessageType.PhishingSpam, 97, "phishing_fraud")
         }
-        if (CREDIT_PATTERN.containsMatchIn(lower)) {
+        if (isAccountCredit(lower, compiled)) {
             return result(MessageType.Credit, 96, "credit")
         }
-        if (REWARD_PATTERN.containsMatchIn(lower)) {
+        if (compiled.rewardPattern.containsMatchIn(lower)) {
             return result(MessageType.RewardCashback, 95, "reward_cashback")
         }
-        if (isFutureDebit(lower)) {
+        if (isFutureDebit(lower, cfg)) {
             return result(MessageType.FutureDebit, 96, "future_debit")
         }
-        if (RECEIPT_PATTERN.containsMatchIn(lower)) {
-            return result(MessageType.Receipt, 97, "receipt")
+        if (compiled.receiptPattern.containsMatchIn(lower)) {
+            return result(MessageType.Receipt, 97, "purchase_receipt")
         }
-        if (isMessagingAppMirror(input)) {
+        if (isMessagingAppMirror(input, compiled)) {
             return result(MessageType.Unknown, 92, "sms_mirror_notification")
         }
         if (isFutureTransaction(input.rawText, input.receivedAtMillis)) {
             return result(MessageType.FutureDebit, 94, "future_transaction_date")
         }
-        if (isSuspiciousLinkPhishing(input)) {
+        if (isSuspiciousLinkPhishing(input, compiled)) {
             return result(MessageType.PhishingSpam, 96, "phishing_suspicious_link")
         }
 
-        val hasAmount = AMOUNT_PATTERN.containsMatchIn(lower)
-        val hasStrongDebit = containsAny(lower, STRONG_DEBIT_KEYWORDS)
-        val hasUpiDebit = hasUpiDebitSignal(lower)
+        val hasAmount = compiled.amountPattern.containsMatchIn(lower)
+        val hasStrongDebit = containsAny(lower, cfg.strongDebitKeywords)
+        val hasUpiDebit = hasUpiDebitSignal(lower, cfg)
 
         if (!hasAmount) {
             return result(MessageType.Unknown, 25, "missing_amount")
@@ -67,52 +73,59 @@ class MessageClassificationRules @Inject constructor() {
         var confidence = 72
         if (hasStrongDebit) confidence += 12
         if (hasUpiDebit) confidence += 8
-        if (SenderValidator.isTrustedBankSender(sender)) confidence += 14
-        if (SenderValidator.isTrustedPaymentAppSender(sender)) confidence += 10
-        if (hasAmount && hasStrongDebit && SenderValidator.isTrustedFinancialSender(sender)) {
+        if (senderValidator.isLikelyBankMessage(sender, input.rawText)) confidence += 14
+        else if (senderValidator.isDltSender(sender)) confidence += 6
+        if (senderValidator.isLikelyPaymentAppSender(sender)) confidence += 10
+        if (hasAmount && hasStrongDebit && senderValidator.isLikelyFinancialMessage(sender, input.rawText)) {
             confidence += 4
         }
         confidence = confidence.coerceAtMost(98)
 
-        return if (confidence >= MessageClassificationResult.NOTIFY_THRESHOLD) {
+        return if (confidence >= cfg.notifyConfidenceThreshold) {
             result(MessageType.ActualDebit, confidence, "rule_engine_actual_debit")
         } else {
             null
         }
     }
 
-    private fun hasUpiDebitSignal(lower: String): Boolean {
-        if (containsAny(lower, STRONG_UPI_KEYWORDS)) return true
-        if (!containsAny(lower, WEAK_UPI_KEYWORDS)) return false
-        return lower.contains("upi") ||
-            containsAny(lower, listOf("phonepe", "paytm", "gpay", "google pay", "amazon pay"))
+    private fun hasUpiDebitSignal(lower: String, cfg: com.example.expensetracker.domain.classification.ClassificationConfig): Boolean {
+        if (containsAny(lower, cfg.strongUpiKeywords)) return true
+        if (!containsAny(lower, cfg.weakUpiKeywords)) return false
+        return lower.contains("upi") || containsAny(lower, cfg.upiBrandKeywords)
     }
 
-    private fun isFutureDebit(lower: String): Boolean {
-        if (!containsAny(lower, FUTURE_DEBIT_KEYWORDS)) return false
-        if (containsAny(lower, COMPLETED_EXECUTION_KEYWORDS)) return false
+    private fun isAccountCredit(lower: String, compiled: CompiledClassificationRules): Boolean {
+        if (!compiled.creditPattern.containsMatchIn(lower)) return false
+        if (compiled.debitPattern.containsMatchIn(lower) && compiled.payeeCreditedPattern.containsMatchIn(lower)) {
+            return false
+        }
+        return true
+    }
+
+    private fun isFutureDebit(lower: String, cfg: com.example.expensetracker.domain.classification.ClassificationConfig): Boolean {
+        if (!containsAny(lower, cfg.futureDebitKeywords)) return false
+        if (containsAny(lower, cfg.completedExecutionKeywords)) return false
         return true
     }
 
     private fun containsAny(text: String, keywords: List<String>): Boolean =
         keywords.any(text::contains)
 
-    private fun isMessagingAppMirror(input: MessageClassificationInput): Boolean {
+    private fun isMessagingAppMirror(input: MessageClassificationInput, compiled: CompiledClassificationRules): Boolean {
         if (input.source != "Notification") return false
         val pkg = input.notificationPackage ?: return false
-        if (pkg !in MESSAGING_APP_PACKAGES) return false
-        return BANK_SMS_PREFIX.matcher(input.rawText).find() ||
-            SENT_FROM_ACCOUNT.matcher(input.rawText).find()
+        if (pkg !in compiled.config.messagingAppPackages) return false
+        return compiled.bankSmsPrefixPattern.matcher(input.rawText).find() ||
+            compiled.sentFromAccountPattern.matcher(input.rawText).find()
     }
 
-    /**
-     * Flags link-based phishing only. "Not you? Call 1800…" is standard on real bank debit SMS
-     * and must not be treated as fraud by itself.
-     */
-    private fun isSuspiciousLinkPhishing(input: MessageClassificationInput): Boolean {
-        if (!SUSPICIOUS_LINK.matcher(input.rawText).find()) return false
-        if (containsAny(input.rawText.lowercase(Locale.US), STRONG_DEBIT_KEYWORDS) &&
-            SenderValidator.isTrustedBankSender(input.sender)
+    private fun isSuspiciousLinkPhishing(
+        input: MessageClassificationInput,
+        compiled: CompiledClassificationRules
+    ): Boolean {
+        if (!compiled.suspiciousLinkPattern.matcher(input.rawText).find()) return false
+        if (containsAny(input.rawText.lowercase(Locale.US), compiled.config.strongDebitKeywords) &&
+            senderValidator.isLikelyBankMessage(input.sender, input.rawText)
         ) {
             return false
         }
@@ -155,112 +168,6 @@ class MessageClassificationRules @Inject constructor() {
         MessageClassificationResult(type = type, confidence = confidence, reason = reason)
 
     companion object {
-        val STRONG_DEBIT_KEYWORDS = listOf(
-            "debited",
-            "spent",
-            "withdrawn",
-            "cash withdrawal",
-            "purchase using card",
-            "purchase on card",
-            "debit alert",
-            "deducted",
-            "nach debit",
-            "emi deducted",
-            "autopay debit",
-            "paid using",
-            "txn successful"
-        )
-
-        private val FUTURE_DEBIT_KEYWORDS = listOf(
-            "will be debited",
-            "will be charged",
-            "due on",
-            "upcoming payment",
-            "upcoming debit",
-            "scheduled payment",
-            "autopay scheduled",
-            "mandate will be",
-            "e-mandate",
-            "standing instruction:",
-            "payment due",
-            "due on 5th",
-            "subscription renewal scheduled",
-            "nach mandate will be presented"
-        )
-
-        private val COMPLETED_EXECUTION_KEYWORDS = listOf(
-            "executed",
-            "completed",
-            "processed successfully",
-            "debited",
-            "deducted",
-            "autopay debit of"
-        )
-
-        private val OTP_PATTERN = Regex(
-            "\\botp\\b|one time password|verification code|authentication code|do not share otp",
-            RegexOption.IGNORE_CASE
-        )
-
-        private val PHISHING_PATTERN = Regex(
-            "click here|bit\\.ly|tinyurl|verify kyc|update pan|account blocked|account frozen|" +
-                "loan approved|claim reward|win money|lottery|congratulations! win|unlock your bank",
-            RegexOption.IGNORE_CASE
-        )
-
-        private val CREDIT_PATTERN = Regex(
-            "\\bcredited\\b|refund|salary|interest credited|credit alert|credit received|neft credit|" +
-                "imps credit received",
-            RegexOption.IGNORE_CASE
-        )
-
-        private val REWARD_PATTERN = Regex(
-            "reward points|cashback earned|bonus points|loyalty points|claim your reward points",
-            RegexOption.IGNORE_CASE
-        )
-
-        private val RECEIPT_PATTERN = Regex(
-            "invoice|receipt|download your bill|tax invoice|order confirmation|" +
-                "thank you for your purchase|thank you for shopping|purchase receipt attached|" +
-                "order confirmed|order has been delivered|download invoice",
-            RegexOption.IGNORE_CASE
-        )
-
-        private val STRONG_UPI_KEYWORDS = listOf(
-            "upi txn",
-            "upi payment",
-            "upi transaction successful"
-        )
-
-        private val WEAK_UPI_KEYWORDS = listOf(
-            "paid to",
-            "sent to",
-            "transferred to"
-        )
-
-        private val AMOUNT_PATTERN = Regex(
-            "(?:rs\\.?|inr|₹)\\s*[0-9,]+(?:\\.[0-9]{1,2})?",
-            RegexOption.IGNORE_CASE
-        )
-
-        private val MESSAGING_APP_PACKAGES = setOf(
-            "com.google.android.apps.messaging",
-            "com.samsung.android.messaging",
-            "com.android.mms"
-        )
-
-        private val BANK_SMS_PREFIX = Pattern.compile("\\b[A-Z]{2}-[A-Z]{4,8}-[A-Z]\\b")
-
-        private val SENT_FROM_ACCOUNT = Pattern.compile(
-            "Sent\\s+Rs\\.?\\s*[0-9,.]+\\s+From\\s+[A-Za-z ]+Bank\\s+A/C",
-            Pattern.CASE_INSENSITIVE
-        )
-
-        private val SUSPICIOUS_LINK = Pattern.compile(
-            "bit\\.ly|tinyurl|http://|https://",
-            Pattern.CASE_INSENSITIVE
-        )
-
         private val COMPACT_DATE = Regex(
             "\\b([0-3]?\\d)(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\\d{2,4})\\b",
             RegexOption.IGNORE_CASE

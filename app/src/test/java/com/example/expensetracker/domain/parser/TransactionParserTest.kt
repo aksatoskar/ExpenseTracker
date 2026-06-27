@@ -37,11 +37,31 @@ class TransactionParserTest {
     }
 
     @Test
-    fun parsesDebitedSmsWithoutPaidKeyword() {
-        val parsed = parser.parse("Txn successful. INR 99 debited from A/c XX1234 on 20-Jun", "SMS", 3_000L)
+    fun parsesIciciUpiDebitWithPayeeCreditedWording() {
+        val parsed = parser.parse(
+            "ICICI Bank Acct XX678 debited for Rs 1190.00 on 27-Jun-26; SWIGGY credited. " +
+                "UPI:683699861026. Call 18002662 for dispute. SMS BLOCK 678 to 9215676766",
+            "SMS",
+            1_000L
+        )
 
         assertNotNull(parsed)
-        assertEquals(9_900L, parsed!!.amountPaise)
+        assertEquals(119_000L, parsed!!.amountPaise)
+        assertEquals("SWIGGY", parsed.merchant)
         assertEquals(TransactionType.Debit, parsed.type)
+    }
+
+    @Test
+    fun parsesIciciSmallUpiDebit() {
+        val parsed = parser.parse(
+            "ICICI Bank Acct XX678 debited for Rs 26.26 on 27-Jun-26; Pronto credited. " +
+                "UPI:731640811815. Call 18002662 for dispute.",
+            "SMS",
+            2_000L
+        )
+
+        assertNotNull(parsed)
+        assertEquals(2_626L, parsed!!.amountPaise)
+        assertEquals("Pronto", parsed.merchant)
     }
 }

@@ -84,7 +84,7 @@ class SettingsViewModel @Inject constructor(
         if (_isSyncing.value) return
         _isSyncing.value = true
         viewModelScope.launch {
-            val count = runCatching { syncSmsInbox() }.getOrDefault(0)
+            val count = runCatching { syncSmsInbox(rescanFromBaseline = true) }.getOrDefault(0)
             if (count >= 0) analytics.log(AnalyticsEvent.SmsSynced(count))
             _isSyncing.value = false
             onResult(count)

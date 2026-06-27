@@ -73,7 +73,17 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
+}
+
+tasks.register<Copy>("syncClassificationRulesTestResource") {
+    from("src/main/assets/classification_rules.json")
+    into("src/test/resources")
+}
+
+tasks.named("preBuild") {
+    dependsOn("syncClassificationRulesTestResource")
 }

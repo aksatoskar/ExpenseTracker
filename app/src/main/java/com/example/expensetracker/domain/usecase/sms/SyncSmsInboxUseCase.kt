@@ -12,10 +12,9 @@ import javax.inject.Inject
 /**
  * Recovers debit transactions from the SMS inbox that live broadcasts may have missed.
  *
- * Scans messages since `max(lastSync, installBaseline)`, ingests new debits and advances the
- * last-sync timestamp. The baseline is recorded on this install's first sync (and reset by a
- * reinstall), so messages predating the current installation are never ingested. Returns the
- * number of new transactions, or `-1` when SMS read permission is missing.
+ * Incremental sync scans since the last sync. Manual **Sync now** rescans from the install
+ * baseline so previously skipped messages (e.g. deduped in error) can be recovered; dedupe
+ * prevents double-inserting transactions already in the database.
  */
 class SyncSmsInboxUseCase @Inject constructor(
     private val smsRepository: SmsRepository,
@@ -27,21 +26,22 @@ class SyncSmsInboxUseCase @Inject constructor(
         const val PERMISSION_DENIED = -1
     }
 
-    suspend operator fun invoke(): Int = withContext(dispatchers.io) {
+    suspend operator fun invoke(rescanFromBaseline: Boolean = false): Int = withContext(dispatchers.io) {
         if (!smsRepository.canReadSms()) return@withContext PERMISSION_DENIED
 
         val now = System.currentTimeMillis()
         val lastSync = settingsRepository.lastSmsSync.first()
         val baseline = settingsRepository.ensureSmsSyncBaseline(now)
-        val since = maxOf(lastSync, baseline)
+        val since = if (rescanFromBaseline) baseline else maxOf(lastSync, baseline)
 
         var newCount = 0
-        smsRepository.readSince(since).forEach { sms ->
+        smsRepository.readSince(sinceMillis = since, inclusive = rescanFromBaseline).forEach { sms ->
             when (
                 processIncomingMessage(
                     text = sms.body,
                     source = "SMS",
-                    timestamp = sms.timestamp
+                    timestamp = sms.timestamp,
+                    sender = sms.address
                 )
             ) {
                 IncomingMessageOutcome.Ingested -> newCount++

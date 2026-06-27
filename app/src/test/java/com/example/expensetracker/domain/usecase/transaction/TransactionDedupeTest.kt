@@ -34,6 +34,29 @@ class TransactionDedupeTest {
     }
 
     @Test
+    fun twoAtmWithdrawalsSameAmountMinutesApartAreNotDuplicates() {
+        val sms1 =
+            "Withdrawn Rs.10000 From HDFC Bank Card x5386 At +Gayatri Apt L J Road " +
+                "On 2026-06-27:08:42:11 Bal Rs.58771.43 Not You? Call 18002586161/SMS BLOCK DC 5386 to 7308080808"
+        val sms2 =
+            "Withdrawn Rs.10000 From HDFC Bank Card x5386 At +Gayatri Apt L J Road " +
+                "On 2026-06-27:08:43:19 Bal Rs.48771.43 Not You? Call 18002586161/SMS BLOCK DC 5386 to 7308080808"
+
+        assertFalse(
+            TransactionDedupe.isSameTransaction(
+                amountA = 1_000_000L,
+                rawA = sms1,
+                merchantA = "Gayatri Apt L J Road",
+                timestampA = 1_000L,
+                amountB = 1_000_000L,
+                rawB = sms2,
+                merchantB = "Gayatri Apt L J Road",
+                timestampB = 68_000L
+            )
+        )
+    }
+
+    @Test
     fun differentReferenceNumbersAreNotDuplicates() {
         assertFalse(
             TransactionDedupe.isSameTransaction(

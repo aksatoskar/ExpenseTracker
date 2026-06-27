@@ -1,37 +1,51 @@
 package com.example.expensetracker.data.classification
 
-/** Validates SMS sender IDs against known bank and payment-app patterns. */
-object SenderValidator {
+import com.example.expensetracker.domain.classification.CompiledClassificationRules
+import com.example.expensetracker.domain.repository.ClassificationConfigRepository
+import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Singleton
 
-    private val TRUSTED_BANK_CODES = setOf(
-        "HDFCBK", "ICICIB", "SBIINB", "AXISBK", "KOTAKB", "IDFCFB", "FEDBNK",
-        "YESBNK", "RBLBNK", "AUBANK", "INDUSB", "PNBSMS", "CANBNK", "BOBTXN",
-        "UNIONB", "IDBIBK", "CSBBNK", "SCBANK", "CITIBK", "HSBCIN"
-    )
+@Singleton
+class SenderValidator @Inject constructor(
+    private val configRepository: ClassificationConfigRepository
+) {
+    private val rules: CompiledClassificationRules
+        get() = configRepository.current()
 
-    private val TRUSTED_PAYMENT_APP_CODES = setOf(
-        "PHONEPE", "PAYTM", "GPAY", "GOOGLEPAY", "AMAZONPAY", "CRED", "BHIM"
-    )
+    private val dltSender = Regex("^[A-Z]{2}-([A-Z0-9]{4,10})-[A-Z]$")
 
-    private val DLT_SENDER = Regex("^[A-Z]{2}-([A-Z0-9]{4,10})-[A-Z]$")
+    fun isDltSender(sender: String?): Boolean =
+        dltSender.matches(sender?.trim()?.uppercase(Locale.US).orEmpty())
 
     fun extractSenderCode(sender: String?): String? {
-        val upper = sender?.trim()?.uppercase().orEmpty()
+        val upper = sender?.trim()?.uppercase(Locale.US).orEmpty()
         if (upper.isBlank()) return null
-        DLT_SENDER.matchEntire(upper)?.groupValues?.getOrNull(1)?.let { return it }
+        dltSender.matchEntire(upper)?.groupValues?.getOrNull(1)?.let { return it }
         return upper.filter { it.isLetterOrDigit() }.takeIf { it.length in 4..12 }
     }
 
-    fun isTrustedBankSender(sender: String?): Boolean {
+    fun isLikelyBankMessage(sender: String?, messageBody: String): Boolean {
+        val compiled = rules
+        val body = messageBody.lowercase(Locale.US)
+        val hasBankLanguage = compiled.bankBodyPattern.containsMatchIn(body)
+        val hasAccountLanguage = compiled.accountBodyPattern.containsMatchIn(body)
+        val hasDebitLanguage = compiled.debitBodyPattern.containsMatchIn(body)
+
+        if (hasBankLanguage && hasAccountLanguage && hasDebitLanguage) return true
+
+        if (!isDltSender(sender)) return false
         val code = extractSenderCode(sender) ?: return false
-        return TRUSTED_BANK_CODES.any(code::contains)
+        if (compiled.bankEntityHintPattern.containsMatchIn(code)) return true
+        if (hasBankLanguage && hasDebitLanguage) return true
+        return hasAccountLanguage && hasDebitLanguage
     }
 
-    fun isTrustedPaymentAppSender(sender: String?): Boolean {
+    fun isLikelyPaymentAppSender(sender: String?): Boolean {
         val code = extractSenderCode(sender) ?: return false
-        return TRUSTED_PAYMENT_APP_CODES.any(code::contains)
+        return rules.paymentAppHintPattern.containsMatchIn(code)
     }
 
-    fun isTrustedFinancialSender(sender: String?): Boolean =
-        isTrustedBankSender(sender) || isTrustedPaymentAppSender(sender)
+    fun isLikelyFinancialMessage(sender: String?, messageBody: String): Boolean =
+        isLikelyBankMessage(sender, messageBody) || isLikelyPaymentAppSender(sender)
 }

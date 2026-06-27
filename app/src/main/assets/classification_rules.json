@@ -1,0 +1,80 @@
+{
+  "strong_debit_keywords": [
+    "debited",
+    "spent",
+    "withdrawn",
+    "cash withdrawal",
+    "purchase using card",
+    "purchase on card",
+    "debit alert",
+    "deducted",
+    "nach debit",
+    "emi deducted",
+    "autopay debit",
+    "paid using",
+    "txn successful"
+  ],
+  "future_debit_keywords": [
+    "will be debited",
+    "will be charged",
+    "due on",
+    "upcoming payment",
+    "upcoming debit",
+    "scheduled payment",
+    "autopay scheduled",
+    "mandate will be",
+    "e-mandate",
+    "standing instruction:",
+    "payment due",
+    "due on 5th",
+    "subscription renewal scheduled",
+    "nach mandate will be presented"
+  ],
+  "completed_execution_keywords": [
+    "executed",
+    "completed",
+    "processed successfully",
+    "debited",
+    "deducted",
+    "autopay debit of"
+  ],
+  "strong_upi_keywords": [
+    "upi txn",
+    "upi payment",
+    "upi transaction successful"
+  ],
+  "weak_upi_keywords": [
+    "paid to",
+    "sent to",
+    "transferred to"
+  ],
+  "upi_brand_keywords": [
+    "phonepe",
+    "paytm",
+    "gpay",
+    "google pay",
+    "amazon pay"
+  ],
+  "messaging_app_packages": [
+    "com.google.android.apps.messaging",
+    "com.samsung.android.messaging",
+    "com.android.mms"
+  ],
+  "bank_entity_hint_pattern": "BANK|BNK|BK|INB|FIN|SBI|SBIN|HDFC|ICICI|AXIS|KOTAK|PNB|BOB|CANARA|UNION|FED|YES|IDFC|INDUS|RBL|AUUB|CSB|SCB|DBS|CITI|HSBC|UCO|IOB|BOI|PSB|MAHB|BAND|KVB|SIB",
+  "payment_app_hint_pattern": "PHONEPE|PAYTM|GPAY|GOOGLEPAY|AMAZONPAY|BHIM|CRED|MOBIKWIK|FREECHARGE",
+  "bank_body_pattern": "\\b([a-z][a-z ]{0,24}bank|hdfc|icici|axis|sbi|state bank|kotak|federal bank|yes bank|idfc|indusind|punjab national|bank of baroda|canara|union bank|indian bank|uco bank|central bank|bandhan|rbl bank|dcb bank|karur vysya|south indian bank)\\b",
+  "account_body_pattern": "\\b(acct|a/c|account|card x\\d|card \\*\\d|\\*[xX]\\d{3,6})\\b",
+  "debit_body_pattern": "\\b(debited|withdrawn|spent|deducted|dr\\b)",
+  "otp_pattern": "\\botp\\b|one time password|verification code|authentication code|do not share otp",
+  "phishing_pattern": "click here|bit\\.ly|tinyurl|verify kyc|update pan|account blocked|account frozen|loan approved|claim reward|win money|lottery|congratulations! win|unlock your bank",
+  "credit_pattern": "\\bcredited\\b|refund|salary|interest credited|credit alert|credit received|neft credit|imps credit received",
+  "debit_pattern": "\\bdebited\\b",
+  "payee_credited_pattern": ";\\s*[a-z0-9 @._-]+?\\s+credited",
+  "reward_pattern": "reward points|cashback earned|bonus points|loyalty points|claim your reward points",
+  "receipt_pattern": "invoice|receipt|download your bill|tax invoice|order confirmation|thank you for your purchase|thank you for shopping|purchase receipt attached|order confirmed|order has been delivered|download invoice",
+  "amount_pattern": "(?:rs\\.?|inr|₹)\\s*[0-9,]+(?:\\.[0-9]{1,2})?",
+  "suspicious_link_pattern": "bit\\.ly|tinyurl|http://|https://",
+  "bank_sms_prefix_pattern": "\\b[A-Z]{2}-[A-Z]{4,8}-[A-Z]\\b",
+  "sent_from_account_pattern": "Sent\\s+Rs\\.?\\s*[0-9,.]+\\s+From\\s+[A-Za-z ]+Bank\\s+A/C",
+  "notify_confidence_threshold": 80
+}

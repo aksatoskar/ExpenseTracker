@@ -7,6 +7,6 @@ interface SmsRepository {
     /** Whether the app currently holds the runtime permission required to read SMS. */
     fun canReadSms(): Boolean
 
-    /** Returns inbox messages newer than [sinceMillis]. */
-    fun readSince(sinceMillis: Long): List<RawSms>
+    /** Returns inbox messages after [sinceMillis]; [inclusive] includes messages at exactly [sinceMillis]. */
+    fun readSince(sinceMillis: Long, inclusive: Boolean = false): List<RawSms>
 }

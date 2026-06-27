@@ -5,10 +5,20 @@ import com.example.expensetracker.domain.classification.MessageType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class MessageClassificationRulesTest {
-    private val rules = MessageClassificationRules()
+    private lateinit var configRepository: DefaultClassificationConfigRepository
+    private lateinit var senderValidator: SenderValidator
+    private lateinit var rules: MessageClassificationRules
+
+    @Before
+    fun setUp() {
+        configRepository = DefaultClassificationConfigRepository()
+        senderValidator = SenderValidator(configRepository)
+        rules = MessageClassificationRules(configRepository, senderValidator)
+    }
 
     @Test
     fun acceptsFederalBankDebitSmsWithStandardSecurityFooter() {
@@ -19,7 +29,7 @@ class MessageClassificationRulesTest {
 
         val result = rules.evaluate(
             MessageClassificationInput(
-                rawText = "Debited Rs 2.00 from a/c X2225 on 27Jun26 00:20 via UPI to aksatoskar-1. " +
+                rawText = "Debited Rs 2.00 from a/c X2685 on 27Jun26 00:20 via UPI to aksatoskar-1. " +
                     "Ref 617817479920.Bal Rs 11660.38. Not you?Call 18004251199 -Federal Bank",
                 source = "SMS",
                 receivedAtMillis = receivedAt,
@@ -173,6 +183,22 @@ class MessageClassificationRulesTest {
         )
 
         assertEquals(MessageType.Credit, result?.type)
+    }
+
+    @Test
+    fun acceptsIciciUpiDebitWithPayeeCreditedWording() {
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "ICICI Bank Acct XX678 debited for Rs 1190.00 on 27-Jun-26; SWIGGY credited. " +
+                    "UPI:683699861026. Call 18002662 for dispute.",
+                source = "SMS",
+                receivedAtMillis = System.currentTimeMillis(),
+                sender = "JD-ICICIT-S"
+            )
+        )
+
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= 80)
     }
 
     @Test
