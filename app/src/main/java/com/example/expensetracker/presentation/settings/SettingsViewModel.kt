@@ -24,11 +24,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import javax.inject.Inject
 
 /**
@@ -50,10 +47,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     init {
-        viewModelScope.launch {
-            runCatching { featureFlagsRepository.refresh() }
-            settingsRepository.ensureSmsSyncBaseline(System.currentTimeMillis())
-        }
+        viewModelScope.launch { runCatching { featureFlagsRepository.refresh() } }
     }
 
     val installationId: StateFlow<String?> =
@@ -70,15 +64,6 @@ class SettingsViewModel @Inject constructor(
 
     val lastSmsSync: StateFlow<Long> =
         settingsRepository.lastSmsSync.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
-
-    /** Earliest calendar date the user can pick for custom SMS sync (app install day). */
-    val smsSyncMinDate: StateFlow<LocalDate> =
-        settingsRepository.smsSyncBaseline
-            .map { baselineMillis ->
-                val millis = baselineMillis ?: System.currentTimeMillis()
-                Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalDate.now())
 
     val currentUser: StateFlow<AuthUser?> =
         authRepository.currentUser.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), authRepository.currentUserOrNull())

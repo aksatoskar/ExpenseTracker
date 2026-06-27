@@ -21,33 +21,33 @@ import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+
+private const val SYNC_LOOKBACK_YEARS = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomSmsSyncDialog(
-    minSelectableDate: LocalDate,
     onDismiss: () -> Unit,
     onConfirm: (from: LocalDate, to: LocalDate) -> Unit
 ) {
     val zone = ZoneId.systemDefault()
     val today = remember { LocalDate.now() }
+    val earliest = remember { today.minusYears(SYNC_LOOKBACK_YEARS.toLong()) }
     val todayMillis = today.atStartOfDay(zone).toInstant().toEpochMilli()
-    val installFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy") }
     val pickerColors = dateRangePickerColors()
 
     val state = rememberDateRangePickerState(
         initialSelectedStartDateMillis = todayMillis,
         initialSelectedEndDateMillis = todayMillis,
-        selectableDates = remember(minSelectableDate, today) {
+        selectableDates = remember(earliest, today) {
             object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                     val date = Instant.ofEpochMilli(utcTimeMillis).atZone(zone).toLocalDate()
-                    return !date.isBefore(minSelectableDate) && !date.isAfter(today)
+                    return !date.isBefore(earliest) && !date.isAfter(today)
                 }
 
                 override fun isSelectableYear(year: Int): Boolean =
-                    year in minSelectableDate.year..today.year
+                    year in earliest.year..today.year
             }
         }
     )
@@ -86,7 +86,7 @@ fun CustomSmsSyncDialog(
                     ) {
                         Text("Select start and end dates")
                         Text(
-                            "Only SMS since ${minSelectableDate.format(installFormatter)} (app install) can be synced.",
+                            "Scans your SMS inbox for bank debits in the selected range.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

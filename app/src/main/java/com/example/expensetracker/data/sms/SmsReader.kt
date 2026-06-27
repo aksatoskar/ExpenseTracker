@@ -43,7 +43,7 @@ class SmsReader @Inject constructor(
     }
 
     /** Returns up to [limit] inbox messages in `[startMillis, endMillis]`, oldest first. */
-    fun readBetween(startMillis: Long, endMillis: Long, limit: Int = 2_000): List<RawSms> {
+    fun readBetween(startMillis: Long, endMillis: Long, limit: Int = 5_000): List<RawSms> {
         val results = mutableListOf<RawSms>()
         val projection = arrayOf(Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.ADDRESS)
         val selection = "${Telephony.Sms.DATE} >= ? AND ${Telephony.Sms.DATE} <= ?"

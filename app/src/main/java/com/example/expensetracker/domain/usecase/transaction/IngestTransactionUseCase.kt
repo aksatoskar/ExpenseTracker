@@ -24,7 +24,7 @@ class IngestTransactionUseCase @Inject constructor(
 ) {
     private val ingestMutex = Mutex()
 
-    suspend operator fun invoke(parsed: ParsedTransaction): Boolean = ingestMutex.withLock {
+    suspend operator fun invoke(parsed: ParsedTransaction, notifyUser: Boolean = true): Boolean = ingestMutex.withLock {
         val recent = transactionRepository.findRecentAmountMatches(
             amountPaise = parsed.amountPaise,
             type = parsed.type,
@@ -45,10 +45,12 @@ class IngestTransactionUseCase @Inject constructor(
             category = rule?.category,
             priority = rule?.priority,
             status = TransactionStatus.PendingReview,
-            notified = false
+            notified = !notifyUser
         )
         val id = transactionRepository.insert(transaction)
-        showDetectedNotification(transaction.copy(id = id))
+        if (notifyUser) {
+            showDetectedNotification(transaction.copy(id = id))
+        }
         transaction.category?.let { checkBudgetAlerts(it) }
         true
     }

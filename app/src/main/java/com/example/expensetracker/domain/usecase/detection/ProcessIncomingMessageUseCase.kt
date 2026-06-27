@@ -18,7 +18,8 @@ class ProcessIncomingMessageUseCase @Inject constructor(
         source: String,
         timestamp: Long,
         sender: String? = null,
-        notificationPackage: String? = null
+        notificationPackage: String? = null,
+        notifyUser: Boolean = true
     ): IncomingMessageOutcome {
         val parsed = parser.parse(text, source, timestamp) ?: return IncomingMessageOutcome.NotTransaction
 
@@ -36,7 +37,7 @@ class ProcessIncomingMessageUseCase @Inject constructor(
         }
 
         recordDetectedMessage(parsed, sender ?: notificationPackage)
-        return if (ingestTransaction(parsed)) {
+        return if (ingestTransaction(parsed, notifyUser = notifyUser)) {
             IncomingMessageOutcome.Ingested
         } else {
             IncomingMessageOutcome.Duplicate

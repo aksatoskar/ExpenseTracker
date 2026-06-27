@@ -50,9 +50,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override val lastSmsSync: Flow<Long> =
         store.data.map { it[KEY_LAST_SYNC] ?: 0L }
 
-    override val smsSyncBaseline: Flow<Long?> =
-        store.data.map { it[KEY_SMS_BASELINE] }
-
     override val lastBudgetArchiveMonth: Flow<String?> =
         store.data.map { it[KEY_LAST_ARCHIVE] }
 

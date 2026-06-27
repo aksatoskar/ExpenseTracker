@@ -13,9 +13,9 @@ import javax.inject.Inject
 /**
  * Recovers debit transactions from the SMS inbox that live broadcasts may have missed.
  *
- * Background startup sync is incremental since the last sync. Manual sync uses an explicit
- * [range] (default **today** from the UI). Dedupe prevents double-inserting transactions
- * already in the database.
+ * Background startup sync is incremental since the last sync (from install baseline).
+ * Manual sync scans the user-selected [range] with no install-date limit and does not show
+ * detection notifications; dedupe prevents double-inserting transactions already in the database.
  */
 class SyncSmsInboxUseCase @Inject constructor(
     private val smsRepository: SmsRepository,
@@ -39,20 +39,22 @@ class SyncSmsInboxUseCase @Inject constructor(
             val since = maxOf(lastSync, baseline)
             smsRepository.readSince(sinceMillis = since, inclusive = false)
         } else {
-            val start = maxOf(range.startMillis, baseline)
+            val start = range.startMillis
             val end = minOf(range.endMillis, now)
             if (start > end) return@withContext 0
             smsRepository.readBetween(startMillis = start, endMillis = end)
         }
 
         var newCount = 0
+        val notifyUser = range == null
         messages.forEach { sms ->
             when (
                 processIncomingMessage(
                     text = sms.body,
                     source = "SMS",
                     timestamp = sms.timestamp,
-                    sender = sms.address
+                    sender = sms.address,
+                    notifyUser = notifyUser
                 )
             ) {
                 IncomingMessageOutcome.Ingested -> newCount++

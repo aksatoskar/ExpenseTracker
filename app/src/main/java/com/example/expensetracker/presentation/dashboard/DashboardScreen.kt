@@ -180,12 +180,10 @@ private fun SyncStatusCard() {
     val settingsVm: SettingsViewModel = hiltViewModel()
     val lastSync by settingsVm.lastSmsSync.collectAsState()
     val syncing by settingsVm.isSyncing.collectAsState()
-    val smsSyncMinDate by settingsVm.smsSyncMinDate.collectAsState()
     var showCustomSync by remember { mutableStateOf(false) }
 
     if (showCustomSync) {
         CustomSmsSyncDialog(
-            minSelectableDate = smsSyncMinDate,
             onDismiss = { showCustomSync = false },
             onConfirm = { from, to ->
                 showCustomSync = false
