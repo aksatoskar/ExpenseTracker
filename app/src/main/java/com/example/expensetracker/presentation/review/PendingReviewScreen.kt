@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,25 +44,33 @@ fun PendingReviewScreen(
     onBack: () -> Unit,
     openReview: (Long) -> Unit
 ) {
-    BackHandler(onBack = onBack)
     val vm: PendingReviewViewModel = hiltViewModel()
     val pending by vm.pending.collectAsState()
     var showDeleteAll by remember { mutableStateOf(false) }
+    var showDeleteSelected by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
+
+    fun exitSelectionMode() {
+        selectionMode = false
+        selectedIds = emptySet()
+    }
+
+    BackHandler {
+        if (selectionMode) exitSelectionMode() else onBack()
+    }
 
     if (showDeleteAll) {
         AlertDialog(
             onDismissRequest = { showDeleteAll = false },
             title = { Text("Delete all pending?") },
-            text = {
-                Text(
-                    deleteAllConfirmationMessage(pending.size)
-                )
-            },
+            text = { Text(deleteAllConfirmationMessage(pending.size)) },
             confirmButton = {
                 Button(
                     onClick = {
                         vm.deleteAllPending()
                         showDeleteAll = false
+                        exitSelectionMode()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete all") }
@@ -72,38 +81,77 @@ fun PendingReviewScreen(
         )
     }
 
+    if (showDeleteSelected) {
+        AlertDialog(
+            onDismissRequest = { showDeleteSelected = false },
+            title = { Text("Delete selected?") },
+            text = { Text(deleteSelectedConfirmationMessage(selectedIds.size)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        vm.deleteSelected(selectedIds)
+                        showDeleteSelected = false
+                        exitSelectionMode()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSelected = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                IconButton(
+                    onClick = { if (selectionMode) exitSelectionMode() else onBack() }
+                ) {
+                    Icon(
+                        if (selectionMode) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = if (selectionMode) "Cancel selection" else "Back"
+                    )
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Pending review",
+                        if (selectionMode) "${selectedIds.size} selected" else "Pending review",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        pendingCountLabel(pending.size),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                if (pending.isNotEmpty()) {
-                    TextButton(onClick = { showDeleteAll = true }) {
+                    if (!selectionMode) {
                         Text(
-                            "Delete all",
-                            color = MaterialTheme.colorScheme.error,
-                            maxLines = 1
+                            pendingCountLabel(pending.size),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    }
+                }
+                when {
+                    selectionMode && selectedIds.isNotEmpty() -> {
+                        TextButton(onClick = { showDeleteSelected = true }) {
+                            Text(
+                                "Delete (${selectedIds.size})",
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    !selectionMode && pending.isNotEmpty() -> {
+                        TextButton(onClick = { showDeleteAll = true }) {
+                            Text(
+                                "Delete all",
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
@@ -127,7 +175,31 @@ fun PendingReviewScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(pending, key = { it.id }) { transaction ->
-                        TransactionRow(transaction = transaction, onClick = { openReview(transaction.id) })
+                        val selected = transaction.id in selectedIds
+                        TransactionRow(
+                            transaction = transaction,
+                            selectionMode = selectionMode,
+                            selected = selected,
+                            onClick = {
+                                if (selectionMode) {
+                                    val updated = if (selected) {
+                                        selectedIds - transaction.id
+                                    } else {
+                                        selectedIds + transaction.id
+                                    }
+                                    selectedIds = updated
+                                    if (updated.isEmpty()) selectionMode = false
+                                } else {
+                                    openReview(transaction.id)
+                                }
+                            },
+                            onLongClick = {
+                                if (!selectionMode) {
+                                    selectionMode = true
+                                    selectedIds = setOf(transaction.id)
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -146,4 +218,10 @@ private fun deleteAllConfirmationMessage(count: Int): String =
     when (count) {
         1 -> "This permanently removes 1 uncategorized transaction from your history. This cannot be undone."
         else -> "This permanently removes all $count uncategorized transactions from your history. This cannot be undone."
+    }
+
+private fun deleteSelectedConfirmationMessage(count: Int): String =
+    when (count) {
+        1 -> "This permanently removes 1 selected transaction from your history. This cannot be undone."
+        else -> "This permanently removes $count selected transactions from your history. This cannot be undone."
     }

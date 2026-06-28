@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.expensetracker.data.local.entity.TransactionEntity
 import com.example.expensetracker.domain.repository.TransactionRepository
 import com.example.expensetracker.domain.usecase.transaction.DeleteAllPendingTransactionsUseCase
+import com.example.expensetracker.domain.usecase.transaction.DeleteTransactionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +16,8 @@ import javax.inject.Inject
 @HiltViewModel
 class PendingReviewViewModel @Inject constructor(
     transactionRepository: TransactionRepository,
-    private val deleteAllPendingTransactions: DeleteAllPendingTransactionsUseCase
+    private val deleteAllPendingTransactions: DeleteAllPendingTransactionsUseCase,
+    private val deleteTransaction: DeleteTransactionUseCase
 ) : ViewModel() {
 
     val pending: StateFlow<List<TransactionEntity>> =
@@ -23,5 +25,12 @@ class PendingReviewViewModel @Inject constructor(
 
     fun deleteAllPending() {
         viewModelScope.launch { deleteAllPendingTransactions() }
+    }
+
+    fun deleteSelected(ids: Set<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { deleteTransaction(it) }
+        }
     }
 }

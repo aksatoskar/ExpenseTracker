@@ -1,6 +1,7 @@
 package com.example.expensetracker.presentation.common
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -23,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,15 +57,36 @@ fun SectionHeader(title: String) {
 }
 
 /** Single transaction list item: category accent bar, merchant, category chip, date and amount. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TransactionRow(transaction: TransactionEntity, onClick: () -> Unit) {
+fun TransactionRow(
+    transaction: TransactionEntity,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null
+) {
     val accent = categoryColor(transaction.category)
     Card(
-        Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().then(
+            if (onLongClick != null) {
+                Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            } else {
+                Modifier.clickable(onClick = onClick)
+            }
+        ),
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (selectionMode) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
             Box(
                 Modifier
                     .width(5.dp)
