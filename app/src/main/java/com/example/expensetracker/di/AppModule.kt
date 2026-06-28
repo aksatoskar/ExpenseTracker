@@ -7,12 +7,14 @@ import com.example.expensetracker.data.feature.FirebaseFeatureFlagsRepository
 import com.example.expensetracker.data.identity.FirebaseInstallationIdRepository
 import com.example.expensetracker.data.notification.AndroidNotifier
 import com.example.expensetracker.data.repository.BudgetRepositoryImpl
+import com.example.expensetracker.data.repository.CustomCategoryRepositoryImpl
 import com.example.expensetracker.data.repository.DetectedMessageRepositoryImpl
 import com.example.expensetracker.data.repository.SettingsRepositoryImpl
 import com.example.expensetracker.data.repository.SmsRepositoryImpl
 import com.example.expensetracker.data.repository.TransactionRepositoryImpl
 import com.example.expensetracker.domain.notification.Notifier
 import com.example.expensetracker.domain.repository.BudgetRepository
+import com.example.expensetracker.domain.repository.CustomCategoryRepository
 import com.example.expensetracker.domain.repository.DetectedMessageRepository
 import com.example.expensetracker.domain.repository.ClassificationConfigRepository
 import com.example.expensetracker.domain.repository.FeatureFlagsRepository
@@ -34,6 +36,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindTransactionRepository(impl: TransactionRepositoryImpl): TransactionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCustomCategoryRepository(impl: CustomCategoryRepositoryImpl): CustomCategoryRepository
 
     @Binds
     @Singleton

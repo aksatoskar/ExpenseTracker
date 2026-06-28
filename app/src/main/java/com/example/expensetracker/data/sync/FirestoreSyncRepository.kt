@@ -4,6 +4,8 @@ import com.example.expensetracker.core.concurrency.DispatcherProvider
 import com.example.expensetracker.data.local.ExpenseDao
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.CustomCategoryEntity
+import com.example.expensetracker.data.local.entity.DeletedBudgetEntity
 import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.MonthlyReportEntity
@@ -29,7 +31,7 @@ import javax.inject.Singleton
  * - transactions: union, deduped by a stable content-derived [TransactionEntity.syncId] (doc id).
  * - merchantRules: last-write-wins by `updatedAt` (doc id = merchantKey).
  * - budgetHistory / monthlyReports: union by natural key (immutable monthly snapshots).
- * - budgets: this device wins on conflict (doc id = category; budgets carry no timestamp).
+ * - budgets: union with delete tombstones; a recreated local budget clears its tombstone.
  */
 @Singleton
 class FirestoreSyncRepository @Inject constructor(
@@ -70,6 +72,24 @@ class FirestoreSyncRepository @Inject constructor(
             dao.deleteTransactionBySyncId(id)
         }
 
+        // --- Custom categories: union by syncId (before transactions so sync ids resolve on pull) ---
+        val customCol = userDoc.collection(COL_CUSTOM_CATEGORIES)
+        val localCustom = dao.getCustomCategories().associateBy { it.syncId }
+        val remoteCustomDocs = customCol.get().await().documents
+        val remoteCustomIds = remoteCustomDocs.map { it.id }.toSet()
+
+        remoteCustomDocs.forEach { doc ->
+            if (!localCustom.containsKey(doc.id)) {
+                doc.toCustomCategory()?.let { dao.upsertCustomCategory(it); pulled++ }
+            }
+        }
+        localCustom.values.forEach { custom ->
+            if (custom.syncId !in remoteCustomIds) {
+                customCol.document(custom.syncId).set(custom.toMap()).await()
+                pushed++
+            }
+        }
+
         // --- Transactions: union by syncId, skipping anything tombstoned ---
         val localTxns = dao.getAllTransactions()
             .filter { it.syncId !in tombstoneIds }
@@ -80,25 +100,63 @@ class FirestoreSyncRepository @Inject constructor(
 
         remoteTxns.forEach { doc ->
             if (!localBySync.containsKey(doc.id) && doc.id !in tombstoneIds) {
-                dao.insertTransaction(doc.toTransaction())
+                dao.insertTransaction(doc.toTransaction(dao))
                 pulled++
             }
         }
         localTxns.forEach { txn ->
             if (txn.syncId !in remoteIds) {
-                txnCol.document(txn.syncId!!).set(txn.toMap()).await()
+                txnCol.document(txn.syncId!!).set(txn.toSyncMap()).await()
                 pushed++
             }
         }
 
-        // --- Budgets: this device wins ---
+        // --- Budgets: tombstones first, then merge active budgets ---
         val budgetCol = userDoc.collection(COL_BUDGETS)
+        val budgetTombstoneCol = userDoc.collection(COL_DELETED_BUDGETS)
+
+        val activeLocalBudgetCats = dao.getBudgets().map { it.category }.toSet()
+        activeLocalBudgetCats.forEach { category ->
+            dao.clearDeletedBudget(category)
+            budgetTombstoneCol.document(category.name).delete().await()
+        }
+
+        val localBudgetTombstones = dao.getDeletedBudgets().associateBy { it.category.name }
+        val remoteBudgetTombstoneDocs = budgetTombstoneCol.get().await().documents
+        val remoteBudgetTombstoneIds = remoteBudgetTombstoneDocs.map { it.id }.toSet()
+
+        remoteBudgetTombstoneDocs.forEach { doc ->
+            if (doc.id in activeLocalBudgetCats.map { it.name }) return@forEach
+            val category = runCatching { Category.valueOf(doc.id) }.getOrNull() ?: return@forEach
+            if (!localBudgetTombstones.containsKey(doc.id)) {
+                dao.insertDeletedBudget(
+                    DeletedBudgetEntity(category, doc.getLong("deletedAt") ?: System.currentTimeMillis())
+                )
+            }
+        }
+        localBudgetTombstones.values.forEach { tomb ->
+            if (tomb.category.name !in remoteBudgetTombstoneIds) {
+                budgetTombstoneCol.document(tomb.category.name)
+                    .set(mapOf("deletedAt" to tomb.deletedAt))
+                    .await()
+            }
+        }
+
+        val budgetTombstoneCats = dao.getDeletedBudgets()
+            .map { it.category }
+            .filter { it !in activeLocalBudgetCats }
+            .toSet()
+        budgetTombstoneCats.forEach { category ->
+            budgetCol.document(category.name).delete().await()
+            dao.deleteBudgetByCategory(category)
+        }
+
         val localBudgets = dao.getBudgets()
         val localBudgetCats = localBudgets.map { it.category }.toSet()
         val remoteBudgets = budgetCol.get().await().documents
         remoteBudgets.forEach { doc ->
             val cat = runCatching { Category.valueOf(doc.id) }.getOrNull() ?: return@forEach
-            if (cat !in localBudgetCats) {
+            if (cat !in localBudgetCats && cat !in budgetTombstoneCats) {
                 dao.upsertBudget(doc.toBudget(cat))
                 pulled++
             }
@@ -162,6 +220,15 @@ class FirestoreSyncRepository @Inject constructor(
             }
         }
 
+        // Update remote copies when a synced transaction now references a custom category.
+        dao.getAllTransactions()
+            .filter { it.syncId != null && it.syncId !in tombstoneIds && it.customCategoryId != null }
+            .forEach { txn ->
+                if (txn.syncId in remoteIds) {
+                    txnCol.document(txn.syncId!!).set(txn.toSyncMap()).await()
+                }
+            }
+
         SyncResult(pushed, pulled)
     }
 
@@ -174,22 +241,26 @@ class FirestoreSyncRepository @Inject constructor(
         return copy(syncId = generated)
     }
 
-    private fun TransactionEntity.toMap(): Map<String, Any?> = mapOf(
-        "amountPaise" to amountPaise,
-        "merchant" to merchant,
-        "type" to type.name,
-        "timestamp" to timestamp,
-        "source" to source,
-        "rawText" to rawText,
-        "status" to status.name,
-        "category" to category?.name,
-        "priority" to priority?.name,
-        "notes" to notes,
-        "notified" to notified,
-        "syncId" to syncId
-    )
+    private suspend fun TransactionEntity.toSyncMap(): Map<String, Any?> {
+        val customSyncId = customCategoryId?.let { dao.getCustomCategory(it)?.syncId }
+        return mapOf(
+            "amountPaise" to amountPaise,
+            "merchant" to merchant,
+            "type" to type.name,
+            "timestamp" to timestamp,
+            "source" to source,
+            "rawText" to rawText,
+            "status" to status.name,
+            "category" to category?.name,
+            "customCategorySyncId" to customSyncId,
+            "priority" to priority?.name,
+            "notes" to notes,
+            "notified" to notified,
+            "syncId" to syncId
+        )
+    }
 
-    private fun DocumentSnapshot.toTransaction() = TransactionEntity(
+    private suspend fun DocumentSnapshot.toTransaction(dao: ExpenseDao) = TransactionEntity(
         amountPaise = getLong("amountPaise") ?: 0L,
         merchant = getString("merchant").orEmpty(),
         type = getString("type")?.let { TransactionType.valueOf(it) } ?: TransactionType.Debit,
@@ -198,11 +269,30 @@ class FirestoreSyncRepository @Inject constructor(
         rawText = getString("rawText").orEmpty(),
         status = getString("status")?.let { TransactionStatus.valueOf(it) } ?: TransactionStatus.PendingReview,
         category = getString("category")?.let { Category.valueOf(it) },
+        customCategoryId = getString("customCategorySyncId")?.let { syncId ->
+            dao.getCustomCategoryBySyncId(syncId)?.id
+        },
         priority = getString("priority")?.let { Priority.valueOf(it) },
         notes = getString("notes").orEmpty(),
         notified = getBoolean("notified") ?: false,
         syncId = id
     )
+
+    private fun CustomCategoryEntity.toMap(): Map<String, Any?> = mapOf(
+        "name" to name,
+        "syncId" to syncId,
+        "createdAt" to createdAt
+    )
+
+    private fun DocumentSnapshot.toCustomCategory(): CustomCategoryEntity? {
+        val name = getString("name")?.trim().orEmpty()
+        if (name.isBlank()) return null
+        return CustomCategoryEntity(
+            name = name,
+            syncId = id,
+            createdAt = getLong("createdAt") ?: System.currentTimeMillis()
+        )
+    }
 
     private fun BudgetEntity.toMap(): Map<String, Any?> = mapOf(
         "category" to category.name,
@@ -286,8 +376,10 @@ class FirestoreSyncRepository @Inject constructor(
         const val COL_TRANSACTIONS = "transactions"
         const val COL_DELETED_TRANSACTIONS = "deletedTransactions"
         const val COL_BUDGETS = "budgets"
+        const val COL_DELETED_BUDGETS = "deletedBudgets"
         const val COL_MERCHANT_RULES = "merchantRules"
         const val COL_BUDGET_HISTORY = "budgetHistory"
         const val COL_REPORTS = "monthlyReports"
+        const val COL_CUSTOM_CATEGORIES = "customCategories"
     }
 }

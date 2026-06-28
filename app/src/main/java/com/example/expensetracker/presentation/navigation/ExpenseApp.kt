@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
 import com.example.expensetracker.presentation.AppViewModel
 import com.example.expensetracker.presentation.analytics.AnalyticsScreen
 import com.example.expensetracker.presentation.budget.BudgetDetailScreen

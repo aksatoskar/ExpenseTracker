@@ -3,7 +3,8 @@ package com.example.expensetracker.presentation.transactions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.expensetracker.data.local.entity.TransactionEntity
-import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategoryFilter
+import com.example.expensetracker.domain.repository.CustomCategoryRepository
 import com.example.expensetracker.domain.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,18 +42,19 @@ data class TransactionsUiState(
     val query: String = "",
     val sort: TxnSort = TxnSort.DateNewest,
     val period: TxnPeriod = TxnPeriod.All,
-    val category: Category? = null
+    val categoryFilter: CategoryFilter = CategoryFilter.All
 )
 
 @HiltViewModel
 class TransactionsViewModel @Inject constructor(
-    transactionRepository: TransactionRepository
+    transactionRepository: TransactionRepository,
+    customCategoryRepository: CustomCategoryRepository
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
     private val sort = MutableStateFlow(TxnSort.DateNewest)
     private val period = MutableStateFlow(TxnPeriod.All)
-    private val category = MutableStateFlow<Category?>(null)
+    private val categoryFilter = MutableStateFlow<CategoryFilter>(CategoryFilter.All)
     private val page = MutableStateFlow(1)
 
     val uiState: StateFlow<TransactionsUiState> = combine(
@@ -61,13 +63,13 @@ class TransactionsViewModel @Inject constructor(
             query,
             sort,
             period,
-            category
-        ) { all, query, sort, period, category ->
+            categoryFilter
+        ) { all, query, sort, period, categoryFilter ->
             val periodStart = periodStartMillis(period)
             all.asSequence()
                 .filter { it.merchant.contains(query, ignoreCase = true) }
                 .filter { period == TxnPeriod.All || it.timestamp >= periodStart }
-                .filter { category == null || it.category == category }
+                .filter { txn -> matchesCategoryFilter(txn, categoryFilter) }
                 .toList()
                 .let { list ->
                     when (sort) {
@@ -80,7 +82,7 @@ class TransactionsViewModel @Inject constructor(
                     query = query,
                     sort = sort,
                     period = period,
-                    category = category
+                    categoryFilter = categoryFilter
                 )
         },
         page
@@ -93,6 +95,9 @@ class TransactionsViewModel @Inject constructor(
             hasMore = filtered.size > visibleLimit
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionsUiState())
+
+    val customCategories = customCategoryRepository.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setQuery(value: String) {
         query.value = value
@@ -109,8 +114,8 @@ class TransactionsViewModel @Inject constructor(
         resetPage()
     }
 
-    fun setCategory(value: Category?) {
-        category.value = value
+    fun setCategoryFilter(value: CategoryFilter) {
+        categoryFilter.value = value
         resetPage()
     }
 
@@ -124,7 +129,7 @@ class TransactionsViewModel @Inject constructor(
         query.value = ""
         sort.value = TxnSort.DateNewest
         period.value = txnPeriod
-        category.value = null
+        categoryFilter.value = CategoryFilter.All
         resetPage()
     }
 
@@ -134,6 +139,14 @@ class TransactionsViewModel @Inject constructor(
 
     private companion object {
         const val PAGE_SIZE = 20
+
+        fun matchesCategoryFilter(txn: TransactionEntity, filter: CategoryFilter): Boolean =
+            when (filter) {
+                CategoryFilter.All -> true
+                is CategoryFilter.BuiltIn ->
+                    txn.customCategoryId == null && txn.category == filter.category
+                is CategoryFilter.Custom -> txn.customCategoryId == filter.id
+            }
 
         fun periodStartMillis(period: TxnPeriod): Long {
             if (period == TxnPeriod.All) return Long.MIN_VALUE

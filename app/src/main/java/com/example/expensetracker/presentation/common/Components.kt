@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.expensetracker.core.money.formatInr
 import com.example.expensetracker.data.local.entity.TransactionEntity
+import com.example.expensetracker.domain.model.categoryLabel
 
 /** Title row with a colored accent bar, used as a lightweight section divider. */
 @Composable
@@ -65,9 +66,12 @@ fun TransactionRow(
     modifier: Modifier = Modifier,
     selectionMode: Boolean = false,
     selected: Boolean = false,
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
+    customCategoryNames: Map<Long, String> = emptyMap()
 ) {
-    val accent = categoryColor(transaction.category)
+    val isCustom = transaction.customCategoryId != null
+    val accent = categoryColor(transaction.category, isCustom)
+    val label = categoryLabel(transaction.category, transaction.customCategoryId, customCategoryNames)
     Card(
         modifier = modifier.fillMaxWidth().then(
             if (onLongClick != null) {
@@ -108,7 +112,7 @@ fun TransactionRow(
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                transaction.category?.label ?: "Uncategorized",
+                                label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = accent,
                                 fontWeight = FontWeight.Medium

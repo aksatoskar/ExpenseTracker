@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,8 +33,13 @@ fun priorityColor(priority: Priority): Color = when (priority) {
     Priority.Wasteful -> PriorityWastefulColor
 }
 
+/** Distinct accent for user-defined categories. */
+fun customCategoryColor() = Color(0xFF7C3AED)
+
 /** Stable accent color per category (null/Other render neutral grey). */
-fun categoryColor(category: Category?): Color = when (category) {
+fun categoryColor(category: Category?, isCustom: Boolean = false): Color {
+    if (isCustom) return customCategoryColor()
+    return when (category) {
     Category.FoodDining -> Color(0xFFEF4444)
     Category.Shopping -> Color(0xFFEC4899)
     Category.Travel -> Color(0xFF06B6D4)
@@ -44,10 +50,13 @@ fun categoryColor(category: Category?): Color = when (category) {
     Category.Investments -> Color(0xFF059669)
     Category.Entertainment -> Color(0xFFF59E0B)
     Category.Other, null -> Color(0xFF94A3B8)
+    }
 }
 
 /** Representative icon per category. */
-fun categoryIcon(category: Category?): ImageVector = when (category) {
+fun categoryIcon(category: Category?, isCustom: Boolean = false): ImageVector {
+    if (isCustom) return Icons.Default.Star
+    return when (category) {
     Category.FoodDining -> Icons.Default.Restaurant
     Category.Shopping -> Icons.Default.ShoppingCart
     Category.Travel -> Icons.Default.Flight
@@ -58,4 +67,5 @@ fun categoryIcon(category: Category?): ImageVector = when (category) {
     Category.Investments -> Icons.Default.TrendingUp
     Category.Entertainment -> Icons.Default.Movie
     Category.Other, null -> Icons.Default.Category
+    }
 }

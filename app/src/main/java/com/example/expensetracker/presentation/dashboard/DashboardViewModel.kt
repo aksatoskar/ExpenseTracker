@@ -7,7 +7,7 @@ import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
 import com.example.expensetracker.domain.analytics.AnalyticsEvent
 import com.example.expensetracker.domain.analytics.AnalyticsTracker
-import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
 import com.example.expensetracker.domain.model.DashboardState
 import com.example.expensetracker.domain.model.Priority
 import com.example.expensetracker.domain.repository.BudgetRepository
@@ -52,7 +52,7 @@ class DashboardViewModel @Inject constructor(
     fun addManual(
         amountRupees: String,
         merchant: String,
-        category: Category,
+        categorySelection: CategorySelection,
         priority: Priority,
         notes: String,
         timestamp: Long = System.currentTimeMillis()
@@ -63,12 +63,14 @@ class DashboardViewModel @Inject constructor(
             addManualTransaction(
                 amountPaise = rupeesToPaise(amount),
                 merchant = trimmedMerchant,
-                category = category,
+                categorySelection = categorySelection,
                 priority = priority,
                 notes = notes.trim(),
                 timestamp = timestamp
             )
-            analytics.log(AnalyticsEvent.ManualTransactionAdded(category))
+            (categorySelection as? CategorySelection.BuiltIn)?.category?.let {
+                analytics.log(AnalyticsEvent.ManualTransactionAdded(it))
+            }
         }
         return true
     }

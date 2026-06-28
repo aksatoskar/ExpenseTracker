@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.expensetracker.core.money.formatInr
-import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.presentation.common.CategoryFilterDropdown
 import com.example.expensetracker.presentation.common.FilterDropdown
 import com.example.expensetracker.presentation.common.TransactionRow
 
@@ -45,6 +45,10 @@ fun TransactionsScreen(
 ) {
     val vm: TransactionsViewModel = hiltViewModel()
     val state by vm.uiState.collectAsState()
+    val customCategories by vm.customCategories.collectAsState()
+    val customCategoryNames = remember(customCategories) {
+        customCategories.associate { it.id to it.name }
+    }
     val listState = rememberLazyListState()
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -107,11 +111,10 @@ fun TransactionsScreen(
                     onSelect = { vm.setSort(TxnSort.entries[it]) },
                     modifier = Modifier.weight(1f)
                 )
-                FilterDropdown(
-                    label = "Category",
-                    value = state.category?.label ?: "All",
-                    options = listOf("All") + Category.entries.map { it.label },
-                    onSelect = { i -> vm.setCategory(if (i == 0) null else Category.entries[i - 1]) },
+                CategoryFilterDropdown(
+                    selected = state.categoryFilter,
+                    customCategories = customCategories,
+                    onSelected = vm::setCategoryFilter,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -147,7 +150,11 @@ fun TransactionsScreen(
             }
         }
         items(state.transactions, key = { it.id }) { transaction ->
-            TransactionRow(transaction, onClick = { openReview(transaction.id) })
+            TransactionRow(
+                transaction,
+                onClick = { openReview(transaction.id) },
+                customCategoryNames = customCategoryNames
+            )
         }
         if (state.hasMore) {
             item(key = "loading") {

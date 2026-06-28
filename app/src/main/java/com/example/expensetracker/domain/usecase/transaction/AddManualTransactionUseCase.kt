@@ -3,7 +3,8 @@ package com.example.expensetracker.domain.usecase.transaction
 import com.example.expensetracker.core.money.normalizeMerchant
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
-import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
+import com.example.expensetracker.domain.model.toEntityFields
 import com.example.expensetracker.domain.model.Priority
 import com.example.expensetracker.domain.model.TransactionStatus
 import com.example.expensetracker.domain.model.TransactionType
@@ -22,11 +23,12 @@ class AddManualTransactionUseCase @Inject constructor(
     suspend operator fun invoke(
         amountPaise: Long,
         merchant: String,
-        category: Category,
+        categorySelection: CategorySelection,
         priority: Priority,
         notes: String,
         timestamp: Long
     ) {
+        val (category, customCategoryId) = categorySelection.toEntityFields()
         val transaction = TransactionEntity(
             amountPaise = amountPaise,
             merchant = merchant,
@@ -35,21 +37,24 @@ class AddManualTransactionUseCase @Inject constructor(
             source = "Manual",
             rawText = "Manually added",
             category = category,
+            customCategoryId = customCategoryId,
             priority = priority,
             notes = notes,
             status = TransactionStatus.Reviewed,
             notified = true
         )
         transactionRepository.insert(transaction)
-        transactionRepository.upsertMerchantRule(
-            MerchantRuleEntity(
-                merchantKey = normalizeMerchant(merchant),
-                displayMerchant = merchant,
-                category = category,
-                priority = priority,
-                updatedAt = System.currentTimeMillis()
+        if (categorySelection is CategorySelection.BuiltIn) {
+            transactionRepository.upsertMerchantRule(
+                MerchantRuleEntity(
+                    merchantKey = normalizeMerchant(merchant),
+                    displayMerchant = merchant,
+                    category = categorySelection.category,
+                    priority = priority,
+                    updatedAt = System.currentTimeMillis()
+                )
             )
-        )
-        checkBudgetAlerts(category)
+            checkBudgetAlerts(categorySelection.category)
+        }
     }
 }

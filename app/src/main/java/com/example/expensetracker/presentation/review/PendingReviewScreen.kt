@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.expensetracker.presentation.category.CustomCategoryViewModel
 import com.example.expensetracker.presentation.common.TransactionRow
 
 /** Full-screen list of transactions awaiting categorization. */
@@ -45,7 +46,12 @@ fun PendingReviewScreen(
     openReview: (Long) -> Unit
 ) {
     val vm: PendingReviewViewModel = hiltViewModel()
+    val customCategoryVm: CustomCategoryViewModel = hiltViewModel()
     val pending by vm.pending.collectAsState()
+    val customCategories by customCategoryVm.customCategories.collectAsState()
+    val customCategoryNames = remember(customCategories) {
+        customCategories.associate { it.id to it.name }
+    }
     var showDeleteAll by remember { mutableStateOf(false) }
     var showDeleteSelected by remember { mutableStateOf(false) }
     var selectionMode by remember { mutableStateOf(false) }
@@ -198,7 +204,8 @@ fun PendingReviewScreen(
                                     selectionMode = true
                                     selectedIds = setOf(transaction.id)
                                 }
-                            }
+                            },
+                            customCategoryNames = customCategoryNames
                         )
                     }
                 }

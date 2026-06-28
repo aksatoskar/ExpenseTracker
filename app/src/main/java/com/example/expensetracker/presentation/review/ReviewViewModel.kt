@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.expensetracker.data.local.entity.TransactionEntity
 import com.example.expensetracker.domain.analytics.AnalyticsEvent
 import com.example.expensetracker.domain.analytics.AnalyticsTracker
-import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
 import com.example.expensetracker.domain.model.Priority
 import com.example.expensetracker.domain.repository.TransactionRepository
 import com.example.expensetracker.domain.usecase.transaction.DeleteTransactionUseCase
@@ -26,10 +26,13 @@ class ReviewViewModel @Inject constructor(
 
     fun observeTransaction(id: Long): Flow<TransactionEntity?> = transactionRepository.observeTransaction(id)
 
-    fun save(transaction: TransactionEntity, amountPaise: Long, category: Category, priority: Priority, notes: String) {
+    fun save(transaction: TransactionEntity, amountPaise: Long, categorySelection: CategorySelection, priority: Priority, notes: String) {
         viewModelScope.launch {
-            saveReview(transaction, amountPaise, category, priority, notes)
-            analytics.log(AnalyticsEvent.ReviewSaved(category))
+            saveReview(transaction, amountPaise, categorySelection, priority, notes)
+            val analyticsCategory = (categorySelection as? CategorySelection.BuiltIn)?.category
+            if (analyticsCategory != null) {
+                analytics.log(AnalyticsEvent.ReviewSaved(analyticsCategory))
+            }
         }
     }
 

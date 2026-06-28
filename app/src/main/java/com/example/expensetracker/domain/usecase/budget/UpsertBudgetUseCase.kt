@@ -11,6 +11,7 @@ class UpsertBudgetUseCase @Inject constructor(
     private val checkBudgetAlerts: CheckBudgetAlertsUseCase
 ) {
     suspend operator fun invoke(category: Category, limitPaise: Long, existing: BudgetEntity? = null) {
+        budgetRepository.clearBudgetDeleted(category)
         budgetRepository.upsertBudget(
             (existing ?: BudgetEntity(category = category, limitPaise = limitPaise)).copy(limitPaise = limitPaise)
         )

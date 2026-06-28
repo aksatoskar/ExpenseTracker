@@ -16,6 +16,7 @@ import com.example.expensetracker.domain.model.TransactionType
     tableName = "transactions",
     indices = [
         Index("timestamp"), Index("merchant"), Index("status"), Index("category"),
+        Index("customCategoryId"),
         Index(value = ["syncId"], unique = true)
     ]
 )
@@ -29,6 +30,8 @@ data class TransactionEntity(
     val rawText: String,
     val status: TransactionStatus = TransactionStatus.PendingReview,
     val category: Category? = null,
+    /** Local id of a user-defined category; mutually exclusive with [category]. */
+    val customCategoryId: Long? = null,
     val priority: Priority? = null,
     val notes: String = "",
     val notified: Boolean = false,
@@ -44,6 +47,16 @@ data class TransactionEntity(
 @Entity(tableName = "deleted_transactions")
 data class DeletedTransactionEntity(
     @PrimaryKey val syncId: String,
+    val deletedAt: Long
+)
+
+/**
+ * Tombstone for a deleted budget category so sync does not resurrect it from the cloud.
+ * Doc id in Firestore is [Category.name].
+ */
+@Entity(tableName = "deleted_budgets")
+data class DeletedBudgetEntity(
+    @PrimaryKey val category: Category,
     val deletedAt: Long
 )
 
@@ -90,6 +103,21 @@ data class BudgetHistoryEntity(
     val category: Category,
     val limitPaise: Long,
     val spentPaise: Long,
+    val createdAt: Long
+)
+
+/** User-defined spending category, synced across devices by [syncId]. */
+@Entity(
+    tableName = "custom_categories",
+    indices = [
+        Index(value = ["name"], unique = true),
+        Index(value = ["syncId"], unique = true)
+    ]
+)
+data class CustomCategoryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val syncId: String,
     val createdAt: Long
 )
 

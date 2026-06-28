@@ -24,23 +24,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
 import com.example.expensetracker.domain.model.Priority
+import com.example.expensetracker.presentation.common.CategoryDropdownField
 
 /** Form dialog for manually recording a spend the automatic detection missed. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionDialog(
-    onAdd: (String, String, Category, Priority, String) -> Unit,
+    onAdd: (String, String, CategorySelection, Priority, String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     var amount by remember { mutableStateOf("") }
     var merchant by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(Category.FoodDining) }
+    var category by remember { mutableStateOf<CategorySelection>(CategorySelection.BuiltIn(com.example.expensetracker.domain.model.Category.FoodDining)) }
     var priority by remember { mutableStateOf(Priority.Optional) }
     var notes by remember { mutableStateOf("") }
-    var categoryOpen by remember { mutableStateOf(false) }
     var priorityOpen by remember { mutableStateOf(false) }
 
     val amountValue = amount.toDoubleOrNull()
@@ -74,19 +74,11 @@ fun AddTransactionDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                ExposedDropdownMenuBox(expanded = categoryOpen, onExpandedChange = { categoryOpen = it }) {
-                    OutlinedTextField(
-                        readOnly = true,
-                        value = category.label,
-                        onValueChange = {},
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryOpen) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(expanded = categoryOpen, onDismissRequest = { categoryOpen = false }) {
-                        Category.entries.forEach { DropdownMenuItem(text = { Text(it.label) }, onClick = { category = it; categoryOpen = false }) }
-                    }
-                }
+                CategoryDropdownField(
+                    selected = category,
+                    onSelected = { category = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 ExposedDropdownMenuBox(expanded = priorityOpen, onExpandedChange = { priorityOpen = it }) {
                     OutlinedTextField(
                         readOnly = true,

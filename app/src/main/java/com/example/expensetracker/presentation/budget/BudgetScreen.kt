@@ -57,7 +57,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.expensetracker.core.money.formatInr
 import com.example.expensetracker.core.time.DateRange
 import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
 import com.example.expensetracker.domain.model.TransactionType
+import com.example.expensetracker.presentation.common.CategoryDropdownField
 import com.example.expensetracker.presentation.common.SectionHeader
 import com.example.expensetracker.presentation.common.TransactionRow
 import com.example.expensetracker.presentation.common.categoryColor
@@ -93,9 +95,11 @@ private fun BudgetManageView(onBudgetClick: (Category) -> Unit) {
     val vm: BudgetViewModel = hiltViewModel()
     val budgets by vm.budgets.collectAsState()
     val categoryTotals by vm.monthCategoryTotals.collectAsState()
-    var category by remember { mutableStateOf(Category.FoodDining) }
+    var categorySelection by remember {
+        mutableStateOf<CategorySelection>(CategorySelection.BuiltIn(Category.FoodDining))
+    }
     var amount by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
+    val selectedBuiltIn = categorySelection as? CategorySelection.BuiltIn
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Card(
@@ -109,22 +113,17 @@ private fun BudgetManageView(onBudgetClick: (Category) -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                        OutlinedTextField(
-                            readOnly = true,
-                            value = category.label,
-                            onValueChange = {},
-                            singleLine = true,
-                            label = { Text("Category") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                    CategoryDropdownField(
+                        selected = categorySelection,
+                        onSelected = { categorySelection = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (selectedBuiltIn == null) {
+                        Text(
+                            "Monthly budgets apply to built-in categories only.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                            Category.entries.forEach {
-                                DropdownMenuItem(text = { Text(it.label) }, onClick = { category = it; expanded = false })
-                            }
-                        }
                     }
                     OutlinedTextField(
                         value = amount,
@@ -137,10 +136,11 @@ private fun BudgetManageView(onBudgetClick: (Category) -> Unit) {
                     )
                     Button(
                         onClick = {
-                            vm.saveBudget(category, amount, budgets.firstOrNull { it.category == category })
+                            val builtIn = selectedBuiltIn ?: return@Button
+                            vm.saveBudget(builtIn.category, amount, budgets.firstOrNull { it.category == builtIn.category })
                             amount = ""
                         },
-                        enabled = amount.isNotBlank(),
+                        enabled = amount.isNotBlank() && selectedBuiltIn != null,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {

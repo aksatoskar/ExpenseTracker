@@ -8,6 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.CustomCategoryEntity
+import com.example.expensetracker.data.local.entity.DeletedBudgetEntity
 import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
 import com.example.expensetracker.data.local.entity.DetectedMessageEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
@@ -38,9 +40,11 @@ class ExpenseConverters {
         MonthlyReportEntity::class,
         BudgetHistoryEntity::class,
         DeletedTransactionEntity::class,
-        DetectedMessageEntity::class
+        DeletedBudgetEntity::class,
+        DetectedMessageEntity::class,
+        CustomCategoryEntity::class
     ],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(ExpenseConverters::class)
@@ -108,6 +112,42 @@ abstract class ExpenseDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_detected_messages_source` " +
                         "ON `detected_messages` (`source`)"
+                )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `custom_categories` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, " +
+                        "`syncId` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_custom_categories_name` " +
+                        "ON `custom_categories` (`name`)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_custom_categories_syncId` " +
+                        "ON `custom_categories` (`syncId`)"
+                )
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `customCategoryId` INTEGER")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_transactions_customCategoryId` " +
+                        "ON `transactions` (`customCategoryId`)"
+                )
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `deleted_budgets` (" +
+                        "`category` TEXT NOT NULL, " +
+                        "`deletedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`category`))"
                 )
             }
         }

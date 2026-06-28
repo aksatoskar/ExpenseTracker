@@ -3,9 +3,10 @@ package com.example.expensetracker.domain.usecase.transaction
 import com.example.expensetracker.core.money.normalizeMerchant
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
 import com.example.expensetracker.data.local.entity.TransactionEntity
-import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
 import com.example.expensetracker.domain.model.Priority
 import com.example.expensetracker.domain.model.TransactionStatus
+import com.example.expensetracker.domain.model.toEntityFields
 import com.example.expensetracker.domain.repository.TransactionRepository
 import com.example.expensetracker.domain.usecase.budget.CheckBudgetAlertsUseCase
 import javax.inject.Inject
@@ -21,28 +22,32 @@ class SaveReviewUseCase @Inject constructor(
     suspend operator fun invoke(
         transaction: TransactionEntity,
         amountPaise: Long,
-        category: Category,
+        categorySelection: CategorySelection,
         priority: Priority,
         notes: String
     ) {
+        val (category, customCategoryId) = categorySelection.toEntityFields()
         transactionRepository.update(
             transaction.copy(
                 amountPaise = amountPaise,
                 category = category,
+                customCategoryId = customCategoryId,
                 priority = priority,
                 notes = notes,
                 status = TransactionStatus.Reviewed
             )
         )
-        transactionRepository.upsertMerchantRule(
-            MerchantRuleEntity(
-                merchantKey = normalizeMerchant(transaction.merchant),
-                displayMerchant = transaction.merchant,
-                category = category,
-                priority = priority,
-                updatedAt = System.currentTimeMillis()
+        if (categorySelection is CategorySelection.BuiltIn) {
+            transactionRepository.upsertMerchantRule(
+                MerchantRuleEntity(
+                    merchantKey = normalizeMerchant(transaction.merchant),
+                    displayMerchant = transaction.merchant,
+                    category = categorySelection.category,
+                    priority = priority,
+                    updatedAt = System.currentTimeMillis()
+                )
             )
-        )
-        checkBudgetAlerts(category)
+            checkBudgetAlerts(categorySelection.category)
+        }
     }
 }

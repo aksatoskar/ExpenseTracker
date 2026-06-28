@@ -13,10 +13,13 @@ interface BudgetRepository {
     val reports: Flow<List<MonthlyReportEntity>>
 
     suspend fun getBudget(category: Category): BudgetEntity?
+    suspend fun getBudgetById(id: Long): BudgetEntity?
     suspend fun getBudgets(): List<BudgetEntity>
     suspend fun upsertBudget(budget: BudgetEntity)
     suspend fun updateBudget(budget: BudgetEntity)
     suspend fun deleteBudget(id: Long)
+    suspend fun markBudgetDeleted(category: Category)
+    suspend fun clearBudgetDeleted(category: Category)
 
     suspend fun upsertBudgetHistory(history: BudgetHistoryEntity)
     suspend fun upsertMonthlyReport(report: MonthlyReportEntity)

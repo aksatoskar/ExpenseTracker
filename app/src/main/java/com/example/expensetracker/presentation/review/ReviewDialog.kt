@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,11 +28,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.expensetracker.core.money.formatInr
 import com.example.expensetracker.core.money.rupeesToPaise
 import com.example.expensetracker.data.local.entity.TransactionEntity
 import com.example.expensetracker.domain.model.Category
+import com.example.expensetracker.domain.model.CategorySelection
 import com.example.expensetracker.domain.model.Priority
+import com.example.expensetracker.domain.model.resolveCategorySelection
+import com.example.expensetracker.presentation.category.CustomCategoryViewModel
+import com.example.expensetracker.presentation.common.CategoryDropdownField
 import com.example.expensetracker.presentation.common.dateText
 
 /**
@@ -42,18 +48,26 @@ import com.example.expensetracker.presentation.common.dateText
 @Composable
 fun ReviewDialog(
     transaction: TransactionEntity,
-    onSave: (Long, Category, Priority, String) -> Unit,
+    onSave: (Long, CategorySelection, Priority, String) -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var category by remember(transaction.id) { mutableStateOf(transaction.category ?: Category.Other) }
+    val customCategoryVm: CustomCategoryViewModel = hiltViewModel()
+    val customCategories by customCategoryVm.customCategories.collectAsState()
+    val customNames = remember(customCategories) { customCategories.associate { it.id to it.name } }
+
+    var category by remember(transaction.id, customNames) {
+        mutableStateOf(
+            resolveCategorySelection(transaction.category, transaction.customCategoryId, customNames)
+                ?: CategorySelection.BuiltIn(Category.Other)
+        )
+    }
     var priority by remember(transaction.id) { mutableStateOf(transaction.priority ?: Priority.Optional) }
     var notes by remember(transaction.id) { mutableStateOf(transaction.notes) }
     var amount by remember(transaction.id) {
         val p = transaction.amountPaise
         mutableStateOf(if (p % 100L == 0L) (p / 100L).toString() else (p / 100.0).toString())
     }
-    var categoryOpen by remember { mutableStateOf(false) }
     var priorityOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
@@ -80,12 +94,13 @@ fun ReviewDialog(
                 Text("Merchant: ${transaction.merchant}")
                 Text("Date: ${dateText(transaction.timestamp)}")
                 Text("Source: ${transaction.source}")
-                ExposedDropdownMenuBox(expanded = categoryOpen, onExpandedChange = { categoryOpen = it }) {
-                    OutlinedTextField(readOnly = true, value = category.label, onValueChange = {}, label = { Text("Category") }, modifier = Modifier.menuAnchor().fillMaxWidth())
-                    ExposedDropdownMenu(expanded = categoryOpen, onDismissRequest = { categoryOpen = false }) {
-                        Category.entries.forEach { DropdownMenuItem(text = { Text(it.label) }, onClick = { category = it; categoryOpen = false }) }
-                    }
-                }
+                CategoryDropdownField(
+                    selected = category,
+                    onSelected = { category = it },
+                    customCategories = customCategories,
+                    viewModel = customCategoryVm,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 ExposedDropdownMenuBox(expanded = priorityOpen, onExpandedChange = { priorityOpen = it }) {
                     OutlinedTextField(readOnly = true, value = priority.name, onValueChange = {}, label = { Text("Priority") }, modifier = Modifier.menuAnchor().fillMaxWidth())
                     ExposedDropdownMenu(expanded = priorityOpen, onDismissRequest = { priorityOpen = false }) {

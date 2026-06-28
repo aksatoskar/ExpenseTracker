@@ -63,6 +63,7 @@ import com.example.expensetracker.domain.model.Priority
 import com.example.expensetracker.presentation.common.PriorityEssentialColor
 import com.example.expensetracker.presentation.common.PriorityOptionalColor
 import com.example.expensetracker.presentation.common.PriorityWastefulColor
+import com.example.expensetracker.presentation.category.CustomCategoryViewModel
 import com.example.expensetracker.presentation.common.SectionHeader
 import com.example.expensetracker.presentation.common.TransactionRow
 import com.example.expensetracker.presentation.common.categoryColor
@@ -82,7 +83,12 @@ fun DashboardScreen(
     openChartsTab: () -> Unit
 ) {
     val vm: DashboardViewModel = hiltViewModel()
+    val customCategoryVm: CustomCategoryViewModel = hiltViewModel()
     val state by vm.uiState.collectAsState()
+    val customCategories by customCategoryVm.customCategories.collectAsState()
+    val customCategoryNames = remember(customCategories) {
+        customCategories.associate { it.id to it.name }
+    }
     val dashboard = state.dashboard
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -148,7 +154,9 @@ fun DashboardScreen(
         item { SectionHeader("Smart Insights") }
         item { InsightList(dashboard, state.budgets) }
         item { SectionHeader("Recent Transactions") }
-        items(state.latest) { TransactionRow(it, onClick = { openReview(it.id) }) }
+        items(state.latest) {
+            TransactionRow(it, onClick = { openReview(it.id) }, customCategoryNames = customCategoryNames)
+        }
         if (state.latest.isNotEmpty()) {
             item {
                 Row(

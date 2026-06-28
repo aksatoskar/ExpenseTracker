@@ -7,6 +7,8 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.expensetracker.data.local.entity.BudgetEntity
 import com.example.expensetracker.data.local.entity.BudgetHistoryEntity
+import com.example.expensetracker.data.local.entity.CustomCategoryEntity
+import com.example.expensetracker.data.local.entity.DeletedBudgetEntity
 import com.example.expensetracker.data.local.entity.DeletedTransactionEntity
 import com.example.expensetracker.data.local.entity.DetectedMessageEntity
 import com.example.expensetracker.data.local.entity.MerchantRuleEntity
@@ -182,4 +184,40 @@ interface ExpenseDao {
 
     @Query("SELECT * FROM detected_messages WHERE timestamp BETWEEN :start AND :end")
     suspend fun getDetectedMessagesBetween(start: Long, end: Long): List<DetectedMessageEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCustomCategory(category: CustomCategoryEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCustomCategory(category: CustomCategoryEntity)
+
+    @Query("SELECT * FROM custom_categories ORDER BY createdAt ASC")
+    fun observeCustomCategories(): Flow<List<CustomCategoryEntity>>
+
+    @Query("SELECT * FROM custom_categories ORDER BY createdAt ASC")
+    suspend fun getCustomCategories(): List<CustomCategoryEntity>
+
+    @Query("SELECT * FROM custom_categories WHERE id = :id LIMIT 1")
+    suspend fun getCustomCategory(id: Long): CustomCategoryEntity?
+
+    @Query("SELECT * FROM custom_categories WHERE syncId = :syncId LIMIT 1")
+    suspend fun getCustomCategoryBySyncId(syncId: String): CustomCategoryEntity?
+
+    @Query("SELECT * FROM budgets WHERE id = :id LIMIT 1")
+    suspend fun getBudgetById(id: Long): BudgetEntity?
+
+    @Query("DELETE FROM budgets WHERE category = :category")
+    suspend fun deleteBudgetByCategory(category: Category)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDeletedBudget(tombstone: DeletedBudgetEntity)
+
+    @Query("SELECT * FROM deleted_budgets")
+    suspend fun getDeletedBudgets(): List<DeletedBudgetEntity>
+
+    @Query("DELETE FROM deleted_budgets WHERE category = :category")
+    suspend fun clearDeletedBudget(category: Category)
+
+    @Query("SELECT COUNT(*) FROM custom_categories WHERE LOWER(name) = LOWER(:name)")
+    suspend fun customCategoryNameExists(name: String): Int
 }

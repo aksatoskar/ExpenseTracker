@@ -65,10 +65,13 @@ private class FakeBudgetRepository(private var current: BudgetEntity?) : BudgetR
     override val budgetHistory: Flow<List<BudgetHistoryEntity>> = flowOf(emptyList())
     override val reports: Flow<List<MonthlyReportEntity>> = flowOf(emptyList())
     override suspend fun getBudget(category: Category): BudgetEntity? = current
+    override suspend fun getBudgetById(id: Long): BudgetEntity? = current?.takeIf { it.id == id }
     override suspend fun getBudgets(): List<BudgetEntity> = listOfNotNull(current)
     override suspend fun upsertBudget(budget: BudgetEntity) { current = budget; saved = budget }
     override suspend fun updateBudget(budget: BudgetEntity) { current = budget; saved = budget }
-    override suspend fun deleteBudget(id: Long) {}
+    override suspend fun deleteBudget(id: Long) { if (current?.id == id) current = null }
+    override suspend fun markBudgetDeleted(category: Category) {}
+    override suspend fun clearBudgetDeleted(category: Category) {}
     override suspend fun upsertBudgetHistory(history: BudgetHistoryEntity) {}
     override suspend fun upsertMonthlyReport(report: MonthlyReportEntity) {}
 }
