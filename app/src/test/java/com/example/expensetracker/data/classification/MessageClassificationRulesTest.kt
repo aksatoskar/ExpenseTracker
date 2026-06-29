@@ -103,6 +103,38 @@ class MessageClassificationRulesTest {
     }
 
     @Test
+    fun acceptsHdfcSentFromAccountDebitSms() {
+        val receivedAt = java.time.LocalDate.of(2026, 6, 28)
+            .atStartOfDay(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        val shredeva = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "Sent Rs.3580.00 From HDFC Bank A/C *4915 To SHREEDEVA FOODS On 28/06/26 " +
+                    "Ref 125451627257 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
+                source = "SMS",
+                receivedAtMillis = receivedAt,
+                sender = "JM-HDFCBK-T"
+            )
+        )
+        val kamlesh = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "Sent Rs.260.00 From HDFC Bank A/C *4915 To KAMLESH C RATHOD On 28/06/26 " +
+                    "Ref 125452087025 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
+                source = "SMS",
+                receivedAtMillis = receivedAt,
+                sender = "JM-HDFCBK-T"
+            )
+        )
+
+        assertEquals(MessageType.ActualDebit, shredeva?.type)
+        assertTrue(shredeva!!.confidence >= 80)
+        assertEquals(MessageType.ActualDebit, kamlesh?.type)
+        assertTrue(kamlesh!!.confidence >= 80)
+    }
+
+    @Test
     fun acceptsHdfcDebitWithTrustedSender() {
         val result = rules.evaluate(
             MessageClassificationInput(

@@ -61,22 +61,25 @@ class MessageClassificationRules @Inject constructor(
 
         val hasAmount = compiled.amountPattern.containsMatchIn(lower)
         val hasStrongDebit = containsAny(lower, cfg.strongDebitKeywords)
+        val hasSentFromAccount = compiled.sentFromAccountPattern.matcher(input.rawText).find()
         val hasUpiDebit = hasUpiDebitSignal(lower, cfg)
+        val hasDebitSignal = hasStrongDebit || hasSentFromAccount || hasUpiDebit
 
         if (!hasAmount) {
             return result(MessageType.Unknown, 25, "missing_amount")
         }
-        if (!hasStrongDebit && !hasUpiDebit) {
+        if (!hasDebitSignal) {
             return null
         }
 
         var confidence = 72
         if (hasStrongDebit) confidence += 12
+        if (hasSentFromAccount) confidence += 12
         if (hasUpiDebit) confidence += 8
         if (senderValidator.isLikelyBankMessage(sender, input.rawText)) confidence += 14
         else if (senderValidator.isDltSender(sender)) confidence += 6
         if (senderValidator.isLikelyPaymentAppSender(sender)) confidence += 10
-        if (hasAmount && hasStrongDebit && senderValidator.isLikelyFinancialMessage(sender, input.rawText)) {
+        if (hasAmount && hasDebitSignal && senderValidator.isLikelyFinancialMessage(sender, input.rawText)) {
             confidence += 4
         }
         confidence = confidence.coerceAtMost(98)
