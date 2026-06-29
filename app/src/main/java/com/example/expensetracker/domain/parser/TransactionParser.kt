@@ -1,6 +1,7 @@
 package com.example.expensetracker.domain.parser
 
 import com.example.expensetracker.core.money.rupeesToPaise
+import com.example.expensetracker.domain.classification.FutureDebitPatterns
 import com.example.expensetracker.domain.model.ParsedTransaction
 import com.example.expensetracker.domain.model.TransactionType
 import java.util.Locale
@@ -33,6 +34,7 @@ class TransactionParser @Inject constructor() {
 
     fun parse(text: String, source: String, timestamp: Long = System.currentTimeMillis()): ParsedTransaction? {
         val compact = text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim()
+        if (FutureDebitPatterns.isFutureDebitReminder(compact)) return null
         if (!looksFinancial(compact)) return null
 
         val type = resolveType(compact) ?: return null

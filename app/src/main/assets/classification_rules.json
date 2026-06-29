@@ -16,8 +16,12 @@
   ],
   "future_debit_keywords": [
     "will be debited",
+    "will be deducted",
     "will be charged",
+    "due in",
     "due on",
+    "instalment due",
+    "installment due",
     "upcoming payment",
     "upcoming debit",
     "scheduled payment",

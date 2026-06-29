@@ -1,5 +1,6 @@
 package com.example.expensetracker.data.classification
 
+import com.example.expensetracker.domain.classification.FutureDebitPatterns
 import com.example.expensetracker.domain.classification.MessageClassificationInput
 import com.example.expensetracker.domain.classification.MessageClassificationResult
 import com.example.expensetracker.domain.classification.MessageType
@@ -106,6 +107,7 @@ class MessageClassificationRules @Inject constructor(
     }
 
     private fun isFutureDebit(lower: String, cfg: com.example.expensetracker.domain.classification.ClassificationConfig): Boolean {
+        if (FutureDebitPatterns.isFutureDebitReminder(lower)) return true
         if (!containsAny(lower, cfg.futureDebitKeywords)) return false
         if (containsAny(lower, cfg.completedExecutionKeywords)) return false
         return true

@@ -52,6 +52,18 @@ class TransactionParserTest {
     }
 
     @Test
+    fun ignoresGrowwSipDueReminderNotification() {
+        val parsed = parser.parse(
+            "SIP: Instalment due in 2 days ₹20,000.00 will be deducted for " +
+                "Parag Parikh Flexi Cap Fund Direct Growth. Please ensure sufficient bank balance.",
+            "Notification",
+            1_000L
+        )
+
+        assertNull(parsed)
+    }
+
+    @Test
     fun parsesHdfcSentFromAccountDebitSms() {
         val parsed = parser.parse(
             "Sent Rs.3580.00 From HDFC Bank A/C *4915 To SHREEDEVA FOODS On 28/06/26 " +

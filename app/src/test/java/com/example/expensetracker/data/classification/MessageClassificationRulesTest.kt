@@ -76,6 +76,21 @@ class MessageClassificationRulesTest {
     }
 
     @Test
+    fun rejectsGrowwSipDueReminderNotification() {
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "SIP: Instalment due in 2 days ₹20,000.00 will be deducted for " +
+                    "Parag Parikh Flexi Cap Fund Direct Growth. Please ensure sufficient bank balance.",
+                source = "Notification",
+                receivedAtMillis = System.currentTimeMillis(),
+                notificationPackage = "com.nextbillion.groww"
+            )
+        )
+
+        assertEquals(MessageType.FutureDebit, result?.type)
+    }
+
+    @Test
     fun rejectsUpcomingPaymentKeywords() {
         val result = rules.evaluate(
             MessageClassificationInput(
