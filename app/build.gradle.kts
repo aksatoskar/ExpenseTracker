@@ -84,6 +84,11 @@ tasks.register<Copy>("syncClassificationRulesTestResource") {
     into("src/test/resources")
 }
 
+tasks.register<Copy>("syncMessageClassifierTestResource") {
+    from("src/main/assets/message_classifier.tflite")
+    into("src/test/resources")
+}
+
 tasks.named("preBuild") {
-    dependsOn("syncClassificationRulesTestResource")
+    dependsOn("syncClassificationRulesTestResource", "syncMessageClassifierTestResource")
 }

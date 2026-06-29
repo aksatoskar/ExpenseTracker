@@ -1,6 +1,7 @@
 package com.example.expensetracker.data.classification
 
 import com.example.expensetracker.domain.classification.MessageClassificationInput
+import com.example.expensetracker.domain.classification.MessageClassificationResult
 import com.example.expensetracker.domain.classification.MessageType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -21,7 +22,7 @@ class MessageClassificationRulesTest {
     }
 
     @Test
-    fun acceptsFederalBankDebitSmsWithStandardSecurityFooter() {
+    fun defersDebitCandidatesToMl() {
         val receivedAt = java.time.LocalDate.of(2026, 6, 27)
             .atStartOfDay(java.time.ZoneId.systemDefault())
             .toInstant()
@@ -37,15 +38,14 @@ class MessageClassificationRulesTest {
             )
         )
 
-        assertEquals(MessageType.ActualDebit, result?.type)
-        assertTrue(result!!.confidence >= 80)
+        assertNull(result)
     }
 
     @Test
     fun rejectsMessagingAppBankSmsMirror() {
         val result = rules.evaluate(
             MessageClassificationInput(
-                rawText = "JM-HDFCBK-S Sent Rs.6.00 From HDFC Bank A/C *4915 To AKSHAY MEGHASHYAM SATOSKA " +
+                rawText = "JM-HDFCBK-S Sent Rs.6.00 From HDFC Bank A/C *4915 To AKSHAY MEGASHYAM SATOSKA " +
                     "On 25/06/26 Ref 654207042327 Not You? Call 18002586161",
                 source = "Notification",
                 receivedAtMillis = 1_750_000_000_000L,
@@ -76,7 +76,7 @@ class MessageClassificationRulesTest {
     }
 
     @Test
-    fun rejectsGrowwSipDueReminderNotification() {
+    fun defersGrowwSipReminderToMl() {
         val result = rules.evaluate(
             MessageClassificationInput(
                 rawText = "SIP: Instalment due in 2 days ₹20,000.00 will be deducted for " +
@@ -87,20 +87,7 @@ class MessageClassificationRulesTest {
             )
         )
 
-        assertEquals(MessageType.FutureDebit, result?.type)
-    }
-
-    @Test
-    fun rejectsUpcomingPaymentKeywords() {
-        val result = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Your autopay of Rs 999 will be debited on 30-Jun-26 from A/c *1234",
-                source = "SMS",
-                receivedAtMillis = System.currentTimeMillis()
-            )
-        )
-
-        assertEquals(MessageType.FutureDebit, result?.type)
+        assertNull(result)
     }
 
     @Test
@@ -115,95 +102,6 @@ class MessageClassificationRulesTest {
         )
 
         assertEquals(MessageType.Receipt, result?.type)
-    }
-
-    @Test
-    fun acceptsHdfcSentFromAccountDebitSms() {
-        val receivedAt = java.time.LocalDate.of(2026, 6, 28)
-            .atStartOfDay(java.time.ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-
-        val shredeva = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Sent Rs.3580.00 From HDFC Bank A/C *4915 To SHREEDEVA FOODS On 28/06/26 " +
-                    "Ref 125451627257 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
-                source = "SMS",
-                receivedAtMillis = receivedAt,
-                sender = "JM-HDFCBK-T"
-            )
-        )
-        val kamlesh = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Sent Rs.260.00 From HDFC Bank A/C *4915 To KAMLESH C RATHOD On 28/06/26 " +
-                    "Ref 125452087025 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
-                source = "SMS",
-                receivedAtMillis = receivedAt,
-                sender = "JM-HDFCBK-T"
-            )
-        )
-
-        assertEquals(MessageType.ActualDebit, shredeva?.type)
-        assertTrue(shredeva!!.confidence >= 80)
-        assertEquals(MessageType.ActualDebit, kamlesh?.type)
-        assertTrue(kamlesh!!.confidence >= 80)
-    }
-
-    @Test
-    fun acceptsHdfcDebitWithTrustedSender() {
-        val result = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Txn successful. INR 99 debited from A/c XX1234 on 20-Jun-25",
-                source = "SMS",
-                receivedAtMillis = System.currentTimeMillis(),
-                sender = "AD-HDFCBK-S"
-            )
-        )
-
-        assertEquals(MessageType.ActualDebit, result?.type)
-        assertTrue(result!!.confidence >= 80)
-    }
-
-    @Test
-    fun acceptsSpentOnCardMessage() {
-        val result = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Spent Rs.1730.43 on Debit Card ending 4567 at AMAZON",
-                source = "SMS",
-                receivedAtMillis = System.currentTimeMillis(),
-                sender = "VK-AXISBK-S"
-            )
-        )
-
-        assertEquals(MessageType.ActualDebit, result?.type)
-        assertTrue(result!!.confidence >= 80)
-    }
-
-    @Test
-    fun acceptsExecutedStandingInstruction() {
-        val result = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Standing instruction executed. Rs.1500 debited",
-                source = "SMS",
-                receivedAtMillis = System.currentTimeMillis(),
-                sender = "AD-HDFCBK-S"
-            )
-        )
-
-        assertEquals(MessageType.ActualDebit, result?.type)
-    }
-
-    @Test
-    fun defersWeakDebitToMl() {
-        val result = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "Rs.450 paid to Swiggy ref 12345",
-                source = "SMS",
-                receivedAtMillis = System.currentTimeMillis()
-            )
-        )
-
-        assertNull(result)
     }
 
     @Test
@@ -230,22 +128,6 @@ class MessageClassificationRulesTest {
         )
 
         assertEquals(MessageType.Credit, result?.type)
-    }
-
-    @Test
-    fun acceptsIciciUpiDebitWithPayeeCreditedWording() {
-        val result = rules.evaluate(
-            MessageClassificationInput(
-                rawText = "ICICI Bank Acct XX678 debited for Rs 1190.00 on 27-Jun-26; SWIGGY credited. " +
-                    "UPI:683699861026. Call 18002662 for dispute.",
-                source = "SMS",
-                receivedAtMillis = System.currentTimeMillis(),
-                sender = "JD-ICICIT-S"
-            )
-        )
-
-        assertEquals(MessageType.ActualDebit, result?.type)
-        assertTrue(result!!.confidence >= 80)
     }
 
     @Test

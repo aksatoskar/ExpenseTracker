@@ -69,7 +69,43 @@ TRAINING_DATA: list[tuple[str | None, str, int]] = [
         "Ref 617625008733.Bal Rs 11662.38. Not you?Call 18004251199 -Federal Bank",
         0,
     ),
+    (
+        "JM-HDFCBK-T",
+        "Sent Rs.3580.00 From HDFC Bank A/C *4915 To SHREEDEVA FOODS On 28/06/26 "
+        "Ref 125451627257 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
+        0,
+    ),
+    (
+        "JM-HDFCBK-T",
+        "Sent Rs.260.00 From HDFC Bank A/C *4915 To KAMLESH C RATHOD On 28/06/26 "
+        "Ref 125452087025 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
+        0,
+    ),
+    (
+        "AD-HDFCBK-S",
+        "Sent Rs.6.00 From HDFC Bank A/C *4915 To MERCHANT On 25/06/26 Ref 654207042327",
+        0,
+    ),
+    (
+        "JD-ICICIT-S",
+        "ICICI Bank Acct XX678 debited for Rs 1190.00 on 27-Jun-26; SWIGGY credited. "
+        "UPI:683699861026. Call 18002662 for dispute.",
+        0,
+    ),
+    (None, "Rs.450 paid to Swiggy via UPI ref 12345", 0),
+    (None, "Payment successful. Rs 1200 transferred to AMAZON PAY", 0),
     # --- Future debits (1) ---
+    (
+        "com.nextbillion.groww",
+        "SIP: Instalment due in 2 days ₹20,000.00 will be deducted for "
+        "Parag Parikh Flexi Cap Fund Direct Growth. Please ensure sufficient bank balance.",
+        1,
+    ),
+    (
+        "com.nextbillion.groww",
+        "SIP instalment of Rs 5000 is due in 3 days. Please maintain sufficient balance.",
+        1,
+    ),
     (None, "Your account will be debited tomorrow for SIP installment", 1),
     (None, "Autopay scheduled for Rs 999 on 01-Jul-26", 1),
     (None, "Upcoming debit of Rs 500 due on 30-Jun", 1),
@@ -81,6 +117,10 @@ TRAINING_DATA: list[tuple[str | None, str, int]] = [
     (None, "Payment reminder: Rs 1200 due on 15-Aug-26. No debit yet.", 1),
     (None, "E-mandate registered. Auto debit on 05-Jul-26 for Rs 499", 1),
     (None, "Standing instruction: Rs 2000 will be charged on 1st of every month", 1),
+    (None, "Your autopay of Rs 999 will be debited on 30-Jun-26 from A/c *1234", 1),
+    (None, "Rs 15000 will be deducted from your account in 2 days for mutual fund SIP", 1),
+    (None, "Reminder: EMI of Rs 8500 is due in 5 days. No amount debited yet.", 1),
+    (None, "Please ensure sufficient balance. Rs 2000 will be withdrawn on 01-Jul-26", 1),
     # --- Credits (2) ---
     (None, "Rs 1500 credited to your account", 2),
     (None, "Salary of Rs 55000 credited", 2),
@@ -135,8 +175,6 @@ TRAINING_DATA: list[tuple[str | None, str, int]] = [
         "On 25/06/26 Ref 654234436997",
         7,
     ),
-    (None, "Rs.450 paid to Swiggy via UPI ref 12345", 7),
-    (None, "Payment successful. Rs 1200 transferred to AMAZON PAY", 7),
 ]
 
 
@@ -167,7 +205,7 @@ def featurize(text: str) -> np.ndarray:
     return vector
 
 
-def augment(sender: str | None, text: str, label: int, repeats: int = 10) -> list[tuple[np.ndarray, int]]:
+def augment(sender: str | None, text: str, label: int, repeats: int = 14) -> list[tuple[np.ndarray, int]]:
     base = combined_text(sender, text)
     samples: list[tuple[np.ndarray, int]] = []
     variants = [
@@ -212,20 +250,24 @@ def main() -> None:
     model = tf.keras.Sequential(
         [
             tf.keras.layers.Input(shape=(HASH_DIM,)),
+            tf.keras.layers.Dense(256, activation="relu"),
+            tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(128, activation="relu"),
             tf.keras.layers.Dropout(0.15),
-            tf.keras.layers.Dense(64, activation="relu"),
             tf.keras.layers.Dense(NUM_CLASSES, activation="softmax"),
         ]
     )
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.008),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.004),
         loss="categorical_crossentropy",
         metrics=["accuracy"],
     )
-    model.fit(x, y, epochs=150, batch_size=16, verbose=1)
+    model.fit(x, y, epochs=200, batch_size=16, verbose=1)
     export_tflite(model)
     print(f"Wrote {MODEL_PATH} ({MODEL_PATH.stat().st_size} bytes)")
+    import verify_message_classifier
+
+    verify_message_classifier.main()
 
 
 if __name__ == "__main__":

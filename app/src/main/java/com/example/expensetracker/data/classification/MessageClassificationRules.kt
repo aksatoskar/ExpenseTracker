@@ -1,6 +1,5 @@
 package com.example.expensetracker.data.classification
 
-import com.example.expensetracker.domain.classification.FutureDebitPatterns
 import com.example.expensetracker.domain.classification.MessageClassificationInput
 import com.example.expensetracker.domain.classification.MessageClassificationResult
 import com.example.expensetracker.domain.classification.MessageType
@@ -16,7 +15,8 @@ import java.util.regex.Pattern
 import javax.inject.Inject
 
 /**
- * Layered rule engine driven by [ClassificationConfigRepository] (Remote Config + bundled fallback).
+ * Static safety rules only — OTP, phishing, credits, receipts, SMS mirrors, and future-dated
+ * transactions. Debit tense and meaning (actual vs upcoming) are decided by TFLite afterward.
  */
 class MessageClassificationRules @Inject constructor(
     private val configRepository: ClassificationConfigRepository,
@@ -26,11 +26,12 @@ class MessageClassificationRules @Inject constructor(
     private val rules: CompiledClassificationRules
         get() = configRepository.current()
 
+    /**
+     * Returns a definitive result for clear non-debit or structural cases; `null` means defer to ML.
+     */
     fun evaluate(input: MessageClassificationInput): MessageClassificationResult? {
         val compiled = rules
-        val cfg = compiled.config
         val lower = input.rawText.lowercase(Locale.US)
-        val sender = input.sender ?: input.notificationPackage
 
         if (compiled.otpPattern.containsMatchIn(lower)) {
             return result(MessageType.Otp, 98, "otp")
@@ -44,9 +45,6 @@ class MessageClassificationRules @Inject constructor(
         if (compiled.rewardPattern.containsMatchIn(lower)) {
             return result(MessageType.RewardCashback, 95, "reward_cashback")
         }
-        if (isFutureDebit(lower, cfg)) {
-            return result(MessageType.FutureDebit, 96, "future_debit")
-        }
         if (compiled.receiptPattern.containsMatchIn(lower)) {
             return result(MessageType.Receipt, 97, "purchase_receipt")
         }
@@ -59,43 +57,11 @@ class MessageClassificationRules @Inject constructor(
         if (isSuspiciousLinkPhishing(input, compiled)) {
             return result(MessageType.PhishingSpam, 96, "phishing_suspicious_link")
         }
-
-        val hasAmount = compiled.amountPattern.containsMatchIn(lower)
-        val hasStrongDebit = containsAny(lower, cfg.strongDebitKeywords)
-        val hasSentFromAccount = compiled.sentFromAccountPattern.matcher(input.rawText).find()
-        val hasUpiDebit = hasUpiDebitSignal(lower, cfg)
-        val hasDebitSignal = hasStrongDebit || hasSentFromAccount || hasUpiDebit
-
-        if (!hasAmount) {
+        if (!compiled.amountPattern.containsMatchIn(lower)) {
             return result(MessageType.Unknown, 25, "missing_amount")
         }
-        if (!hasDebitSignal) {
-            return null
-        }
 
-        var confidence = 72
-        if (hasStrongDebit) confidence += 12
-        if (hasSentFromAccount) confidence += 12
-        if (hasUpiDebit) confidence += 8
-        if (senderValidator.isLikelyBankMessage(sender, input.rawText)) confidence += 14
-        else if (senderValidator.isDltSender(sender)) confidence += 6
-        if (senderValidator.isLikelyPaymentAppSender(sender)) confidence += 10
-        if (hasAmount && hasDebitSignal && senderValidator.isLikelyFinancialMessage(sender, input.rawText)) {
-            confidence += 4
-        }
-        confidence = confidence.coerceAtMost(98)
-
-        return if (confidence >= cfg.notifyConfidenceThreshold) {
-            result(MessageType.ActualDebit, confidence, "rule_engine_actual_debit")
-        } else {
-            null
-        }
-    }
-
-    private fun hasUpiDebitSignal(lower: String, cfg: com.example.expensetracker.domain.classification.ClassificationConfig): Boolean {
-        if (containsAny(lower, cfg.strongUpiKeywords)) return true
-        if (!containsAny(lower, cfg.weakUpiKeywords)) return false
-        return lower.contains("upi") || containsAny(lower, cfg.upiBrandKeywords)
+        return null
     }
 
     private fun isAccountCredit(lower: String, compiled: CompiledClassificationRules): Boolean {
@@ -103,13 +69,6 @@ class MessageClassificationRules @Inject constructor(
         if (compiled.debitPattern.containsMatchIn(lower) && compiled.payeeCreditedPattern.containsMatchIn(lower)) {
             return false
         }
-        return true
-    }
-
-    private fun isFutureDebit(lower: String, cfg: com.example.expensetracker.domain.classification.ClassificationConfig): Boolean {
-        if (FutureDebitPatterns.isFutureDebitReminder(lower)) return true
-        if (!containsAny(lower, cfg.futureDebitKeywords)) return false
-        if (containsAny(lower, cfg.completedExecutionKeywords)) return false
         return true
     }
 
