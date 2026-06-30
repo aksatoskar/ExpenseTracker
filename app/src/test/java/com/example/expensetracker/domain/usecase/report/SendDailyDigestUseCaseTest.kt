@@ -18,48 +18,61 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-class SendPendingReviewReminderUseCaseTest {
+class SendDailyDigestUseCaseTest {
 
     @Test
-    fun `does nothing when no pending transactions`() = runBlocking {
-        val notifier = RecordingNotifier()
-        val useCase = SendPendingReviewReminderUseCase(
-            transactionRepository = FakeTransactionRepository(pendingTransactions = emptyList()),
-            notifier = notifier
-        )
-
-        useCase()
-
-        assertNull(notifier.pendingCount)
-    }
-
-    @Test
-    fun `notifies with pending count when transactions need review`() = runBlocking {
-        val notifier = RecordingNotifier()
-        val useCase = SendPendingReviewReminderUseCase(
-            transactionRepository = FakeTransactionRepository(
-                pendingTransactions = listOf(samplePending(), samplePending())
+    fun `includes pending debits in daily digest`() = runBlocking {
+        val notifier = RecordingReportNotifier()
+        val useCase = SendDailyDigestUseCase(
+            transactionRepository = FakeDigestRepository(
+                todayDebits = listOf(
+                    sampleDebit(status = TransactionStatus.PendingReview, amountPaise = 1_800_000L)
+                ),
+                pendingTransactions = listOf(
+                    sampleDebit(status = TransactionStatus.PendingReview, amountPaise = 1_800_000L)
+                )
             ),
             notifier = notifier
         )
 
         useCase()
 
-        assertEquals(2, notifier.pendingCount)
+        assertEquals("Today you spent ₹18,000", notifier.title)
+        assertEquals(true, notifier.body?.contains("1 transaction still needs review."))
     }
 
-    private fun samplePending() = TransactionEntity(
-        amountPaise = 100,
+    @Test
+    fun `skips digest when there was no spending today`() = runBlocking {
+        val notifier = RecordingReportNotifier()
+        val useCase = SendDailyDigestUseCase(
+            transactionRepository = FakeDigestRepository(
+                todayDebits = emptyList(),
+                pendingTransactions = listOf(sampleDebit(status = TransactionStatus.PendingReview))
+            ),
+            notifier = notifier
+        )
+
+        useCase()
+
+        assertNull(notifier.title)
+    }
+
+    private fun sampleDebit(
+        status: TransactionStatus,
+        amountPaise: Long = 100
+    ) = TransactionEntity(
+        amountPaise = amountPaise,
         merchant = "Store",
         type = TransactionType.Debit,
-        timestamp = 1L,
+        timestamp = System.currentTimeMillis(),
         source = "SMS",
         rawText = "test",
-        status = TransactionStatus.PendingReview
+        status = status
     )
 }
 
-private class FakeTransactionRepository(
+private class FakeDigestRepository(
+    private val todayDebits: List<TransactionEntity>,
     private val pendingTransactions: List<TransactionEntity>
 ) : TransactionRepository {
     override val latest: Flow<List<TransactionEntity>> = flowOf(emptyList())
@@ -87,22 +100,24 @@ private class FakeTransactionRepository(
     override fun observeTopMerchants(range: DateRange, limit: Int): Flow<List<AmountByMerchant>> = flowOf(emptyList())
     override suspend fun getCategorySpent(category: Category, range: DateRange): Long = 0
     override suspend fun getDebitTransactions(range: DateRange): List<TransactionEntity> = emptyList()
-    override suspend fun getAllDebitTransactions(range: DateRange): List<TransactionEntity> = emptyList()
+    override suspend fun getAllDebitTransactions(range: DateRange): List<TransactionEntity> = todayDebits
 }
 
-private class RecordingNotifier : Notifier {
-    var pendingCount: Int? = null
+private class RecordingReportNotifier : Notifier {
+    var title: String? = null
+    var body: String? = null
 
     override fun createChannels() {}
     override fun showDetected(transactionId: Long, amountPaise: Long, merchant: String, source: String) = true
     override fun showReminder(transactionId: Long, title: String, body: String) = true
-    override fun showPendingReviewReminder(pendingCount: Int): Boolean {
-        this.pendingCount = pendingCount
-        return true
-    }
+    override fun showPendingReviewReminder(pendingCount: Int) = true
     override fun showTest() = true
     override fun showBudgetAlert(category: Category, thresholdPercent: Int, spentPaise: Long, limitPaise: Long) = true
-    override fun showReport(title: String, body: String) = true
+    override fun showReport(title: String, body: String): Boolean {
+        this.title = title
+        this.body = body
+        return true
+    }
     override fun cancel(transactionId: Long) {}
     override fun areNotificationsEnabled() = true
 }

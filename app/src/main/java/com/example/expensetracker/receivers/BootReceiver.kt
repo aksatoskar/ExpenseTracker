@@ -3,6 +3,7 @@ package com.example.expensetracker.receivers
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.example.expensetracker.sync.DailyReminderScheduler
 import com.example.expensetracker.sync.PendingNotificationWorker
 
 class BootReceiver : BroadcastReceiver() {
@@ -12,6 +13,11 @@ class BootReceiver : BroadcastReceiver() {
         ) {
             return
         }
-        PendingNotificationWorker.enqueue(context.applicationContext)
+        val appContext = context.applicationContext
+        PendingNotificationWorker.enqueue(appContext)
+        DailyReminderScheduler.schedule(
+            context = appContext,
+            replaceExisting = intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
+        )
     }
 }

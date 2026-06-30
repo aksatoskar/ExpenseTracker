@@ -47,5 +47,9 @@ interface TransactionRepository {
     fun observeTopMerchants(range: DateRange, limit: Int = 5): Flow<List<AmountByMerchant>>
 
     suspend fun getCategorySpent(category: Category, range: DateRange): Long
+    /** Reviewed debits only — used for dashboard totals and reports. */
     suspend fun getDebitTransactions(range: DateRange): List<TransactionEntity>
+
+    /** All debits in range, including pending review — used for the daily digest. */
+    suspend fun getAllDebitTransactions(range: DateRange): List<TransactionEntity>
 }

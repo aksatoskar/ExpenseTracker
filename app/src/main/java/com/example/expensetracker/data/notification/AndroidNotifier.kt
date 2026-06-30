@@ -38,10 +38,16 @@ class AndroidNotifier @Inject constructor(
             }
         )
         manager.createNotificationChannel(
-            NotificationChannel(REMINDER_CHANNEL, "Expense reminders", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(REMINDER_CHANNEL, "Expense reminders", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Daily review reminders and follow-ups for uncategorized expenses"
+                enableVibration(true)
+            }
         )
         manager.createNotificationChannel(
-            NotificationChannel(REPORT_CHANNEL, "Reports and digests", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(REPORT_CHANNEL, "Reports and digests", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "End-of-day spending summaries and monthly reports"
+                enableVibration(true)
+            }
         )
         manager.createNotificationChannel(
             NotificationChannel(BUDGET_CHANNEL, "Budget alerts", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -110,6 +116,8 @@ class AndroidNotifier @Inject constructor(
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(PendingIntent.getActivity(context, PENDING_REVIEW_DAILY_ID, MainActivity.intent(context), flags()))
             .setAutoCancel(true)
             .build()
@@ -160,6 +168,8 @@ class AndroidNotifier @Inject constructor(
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(PendingIntent.getActivity(context, 30_000, MainActivity.intent(context), flags()))
             .setAutoCancel(true)
             .build()

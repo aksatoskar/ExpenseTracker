@@ -97,6 +97,7 @@ private class FakeTransactionRepository(private val spentPaise: Long) : Transact
     override fun observeTopMerchants(range: DateRange, limit: Int): Flow<List<AmountByMerchant>> = flowOf(emptyList())
     override suspend fun getCategorySpent(category: Category, range: DateRange): Long = spentPaise
     override suspend fun getDebitTransactions(range: DateRange): List<TransactionEntity> = emptyList()
+    override suspend fun getAllDebitTransactions(range: DateRange): List<TransactionEntity> = emptyList()
 }
 
 private class RecordingNotifier : Notifier {

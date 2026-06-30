@@ -10,6 +10,8 @@ class SendPendingReviewReminderUseCase @Inject constructor(
     private val notifier: Notifier
 ) {
     suspend operator fun invoke() {
+        if (!notifier.areNotificationsEnabled()) return
+
         val pending = transactionRepository.getPending()
         if (pending.isEmpty()) return
         notifier.showPendingReviewReminder(pending.size)

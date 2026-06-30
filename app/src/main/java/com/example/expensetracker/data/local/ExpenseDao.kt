@@ -90,6 +90,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM transactions WHERE type = 'Debit' AND status = 'Reviewed' AND timestamp BETWEEN :start AND :end")
     suspend fun getDebitTransactions(start: Long, end: Long): List<TransactionEntity>
 
+    @Query("SELECT * FROM transactions WHERE type = 'Debit' AND timestamp BETWEEN :start AND :end")
+    suspend fun getAllDebitTransactions(start: Long, end: Long): List<TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE amountPaise = :amountPaise AND type = :type AND timestamp BETWEEN :start AND :end")
     suspend fun findRecentAmountMatches(
         amountPaise: Long,

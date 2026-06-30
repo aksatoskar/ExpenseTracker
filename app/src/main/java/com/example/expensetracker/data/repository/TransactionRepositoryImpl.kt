@@ -64,4 +64,7 @@ class TransactionRepositoryImpl @Inject constructor(
 
     override suspend fun getDebitTransactions(range: DateRange): List<TransactionEntity> =
         dao.getDebitTransactions(range.startMillis, range.endMillis)
+
+    override suspend fun getAllDebitTransactions(range: DateRange): List<TransactionEntity> =
+        dao.getAllDebitTransactions(range.startMillis, range.endMillis)
 }
