@@ -6,6 +6,7 @@ import com.example.expensetracker.data.local.entity.TransactionEntity
 import com.example.expensetracker.domain.model.ParsedTransaction
 import com.example.expensetracker.domain.model.TransactionStatus
 import com.example.expensetracker.domain.repository.TransactionRepository
+import com.example.expensetracker.domain.sync.CloudSyncScheduler
 import com.example.expensetracker.domain.usecase.budget.CheckBudgetAlertsUseCase
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,7 +21,8 @@ import kotlinx.coroutines.sync.withLock
 class IngestTransactionUseCase @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val showDetectedNotification: ShowDetectedNotificationUseCase,
-    private val checkBudgetAlerts: CheckBudgetAlertsUseCase
+    private val checkBudgetAlerts: CheckBudgetAlertsUseCase,
+    private val cloudSyncScheduler: CloudSyncScheduler
 ) {
     private val ingestMutex = Mutex()
 
@@ -52,6 +54,7 @@ class IngestTransactionUseCase @Inject constructor(
             showDetectedNotification(transaction.copy(id = id))
         }
         transaction.category?.let { checkBudgetAlerts(it) }
+        cloudSyncScheduler.schedule()
         true
     }
 

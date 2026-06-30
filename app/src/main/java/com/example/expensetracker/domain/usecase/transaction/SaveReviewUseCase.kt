@@ -8,6 +8,7 @@ import com.example.expensetracker.domain.model.Priority
 import com.example.expensetracker.domain.model.TransactionStatus
 import com.example.expensetracker.domain.model.toEntityFields
 import com.example.expensetracker.domain.repository.TransactionRepository
+import com.example.expensetracker.domain.sync.CloudSyncScheduler
 import com.example.expensetracker.domain.usecase.budget.CheckBudgetAlertsUseCase
 import javax.inject.Inject
 
@@ -17,7 +18,8 @@ import javax.inject.Inject
  */
 class SaveReviewUseCase @Inject constructor(
     private val transactionRepository: TransactionRepository,
-    private val checkBudgetAlerts: CheckBudgetAlertsUseCase
+    private val checkBudgetAlerts: CheckBudgetAlertsUseCase,
+    private val cloudSyncScheduler: CloudSyncScheduler
 ) {
     suspend operator fun invoke(
         transaction: TransactionEntity,
@@ -49,5 +51,6 @@ class SaveReviewUseCase @Inject constructor(
             )
             checkBudgetAlerts(categorySelection.category)
         }
+        cloudSyncScheduler.schedule()
     }
 }

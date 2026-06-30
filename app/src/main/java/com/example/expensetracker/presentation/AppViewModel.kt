@@ -9,8 +9,9 @@ import com.example.expensetracker.domain.repository.FeatureFlagsRepository
 import com.example.expensetracker.domain.repository.SettingsRepository
 import com.example.expensetracker.domain.usecase.budget.RenewBudgetsUseCase
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
-import com.example.expensetracker.domain.usecase.sync.SyncDataUseCase
+import com.example.expensetracker.domain.sync.CloudSyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -36,7 +37,7 @@ class AppViewModel @Inject constructor(
     private val renewBudgets: RenewBudgetsUseCase,
     private val analytics: AnalyticsTracker,
     private val authRepository: AuthRepository,
-    private val syncData: SyncDataUseCase,
+    private val cloudSyncScheduler: CloudSyncScheduler,
     private val featureFlagsRepository: FeatureFlagsRepository
 ) : ViewModel() {
 
@@ -61,27 +62,28 @@ class AppViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setOnboardingComplete(true) }
     }
 
-    /** Dismisses the one-time sync prompt; when [sync] is true, also runs a cloud sync. */
+    /** Dismisses the one-time sync prompt; when [sync] is true, also queues a background cloud sync. */
     fun resolveSyncPrompt(sync: Boolean) {
         viewModelScope.launch {
             settingsRepository.setSyncPromptShown(true)
-            if (sync) runCatching { syncData() }
+            if (sync) cloudSyncScheduler.schedule()
         }
     }
 
     /** Reports a bottom-nav screen view to analytics. */
     fun logScreen(name: String) = analytics.logScreen(name)
 
-    /** Runs once per process: recover missed SMS transactions and renew budgets if needed. */
+    /** Runs once per process: recover missed SMS transactions, renew budgets, and queue cloud sync. */
     fun runStartupTasks() {
         if (startupTriggered) return
         startupTriggered = true
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             runCatching { syncSmsInbox() }
                 .getOrNull()
                 ?.takeIf { it >= 0 }
                 ?.let { analytics.log(AnalyticsEvent.SmsSynced(it)) }
             runCatching { renewBudgets() }
+            cloudSyncScheduler.schedule()
         }
     }
 }

@@ -2,6 +2,7 @@ package com.example.expensetracker.domain.usecase.transaction
 
 import com.example.expensetracker.domain.notification.Notifier
 import com.example.expensetracker.domain.repository.TransactionRepository
+import com.example.expensetracker.domain.sync.CloudSyncScheduler
 import com.example.expensetracker.domain.usecase.budget.CheckBudgetAlertsUseCase
 import javax.inject.Inject
 
@@ -12,7 +13,8 @@ import javax.inject.Inject
 class DeleteTransactionUseCase @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val notifier: Notifier,
-    private val checkBudgetAlerts: CheckBudgetAlertsUseCase
+    private val checkBudgetAlerts: CheckBudgetAlertsUseCase,
+    private val cloudSyncScheduler: CloudSyncScheduler
 ) {
     suspend operator fun invoke(id: Long) {
         val existing = transactionRepository.getTransaction(id)
@@ -22,5 +24,6 @@ class DeleteTransactionUseCase @Inject constructor(
         existing?.syncId?.let { transactionRepository.recordDeletion(it) }
         notifier.cancel(id)
         existing?.category?.let { checkBudgetAlerts(it) }
+        cloudSyncScheduler.schedule()
     }
 }

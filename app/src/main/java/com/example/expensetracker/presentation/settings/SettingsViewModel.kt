@@ -18,13 +18,16 @@ import com.example.expensetracker.core.time.DateRange
 import com.example.expensetracker.domain.usecase.sms.SyncSmsInboxUseCase
 import com.example.expensetracker.domain.usecase.sync.SyncDataUseCase
 import com.example.expensetracker.domain.usecase.sync.SyncOutcome
+import com.example.expensetracker.domain.sync.CloudSyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -41,6 +44,7 @@ class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val googleCredentialClient: GoogleCredentialClient,
     private val syncData: SyncDataUseCase,
+    private val cloudSyncScheduler: CloudSyncScheduler,
     private val installationIdRepository: InstallationIdRepository,
     private val featureFlagsRepository: FeatureFlagsRepository,
     detectedMessageRepository: DetectedMessageRepository
@@ -91,11 +95,11 @@ class SettingsViewModel @Inject constructor(
     private fun syncSms(range: DateRange, onResult: (Int) -> Unit) {
         if (_isSyncing.value) return
         _isSyncing.value = true
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val count = runCatching { syncSmsInbox(range) }.getOrDefault(0)
             if (count >= 0) analytics.log(AnalyticsEvent.SmsSynced(count))
             _isSyncing.value = false
-            onResult(count)
+            withContext(Dispatchers.Main) { onResult(count) }
         }
     }
 
@@ -109,24 +113,30 @@ class SettingsViewModel @Inject constructor(
                 return@launch
             }
             authRepository.signInWithGoogle(token).fold(
-                onSuccess = { onResult("Signed in as ${it.email ?: it.displayName ?: "user"}") },
+                onSuccess = {
+                    cloudSyncScheduler.schedule()
+                    onResult("Signed in as ${it.email ?: it.displayName ?: "user"}")
+                },
                 onFailure = { onResult("Sign-in failed: ${it.message ?: "unknown error"}") }
             )
         }
     }
 
-    /** Runs a cloud sync for the signed-in user; [onResult] receives a user-facing message. */
+    /** Runs a cloud sync for the signed-in user off the main thread; [onResult] receives a user-facing message. */
     fun cloudSyncNow(onResult: (String) -> Unit) {
         if (_isCloudSyncing.value) return
         _isCloudSyncing.value = true
         viewModelScope.launch {
-            val message = when (val outcome = syncData()) {
-                is SyncOutcome.NotSignedIn -> "Sign in to sync"
-                is SyncOutcome.Failed -> "Sync failed: ${outcome.error.message ?: "unknown error"}"
-                is SyncOutcome.Success ->
-                    "Synced (${outcome.result.pushed} up, ${outcome.result.pulled} down)"
+            val message = withContext(Dispatchers.IO) {
+                val outcomeMessage = when (val outcome = syncData()) {
+                    is SyncOutcome.NotSignedIn -> "Sign in to sync"
+                    is SyncOutcome.Failed -> "Sync failed: ${outcome.error.message ?: "unknown error"}"
+                    is SyncOutcome.Success ->
+                        "Synced (${outcome.result.pushed} up, ${outcome.result.pulled} down)"
+                }
+                settingsRepository.setSyncPromptShown(true)
+                outcomeMessage
             }
-            settingsRepository.setSyncPromptShown(true)
             _isCloudSyncing.value = false
             onResult(message)
         }
