@@ -52,6 +52,21 @@ class TransactionParserTest {
     }
 
     @Test
+    fun parsesHdfcSentFromAccountDebitSmsWithUpiPayee() {
+        val parsed = parser.parse(
+            "Sent Rs.18000.00 From HDFC Bank A/C *4915 To mr.mayurdeshpande-4@okaxi On 30/06/26 " +
+                "Ref 618173294378 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
+            "SMS",
+            1_000L
+        )
+
+        assertNotNull(parsed)
+        assertEquals(1_800_000L, parsed!!.amountPaise)
+        assertEquals("mr.mayurdeshpande-4@okaxi", parsed.merchant)
+        assertEquals(TransactionType.Debit, parsed.type)
+    }
+
+    @Test
     fun parsesHdfcSentFromAccountDebitSms() {
         val parsed = parser.parse(
             "Sent Rs.3580.00 From HDFC Bank A/C *4915 To SHREEDEVA FOODS On 28/06/26 " +

@@ -15,8 +15,9 @@ import java.util.regex.Pattern
 import javax.inject.Inject
 
 /**
- * Static safety rules only — OTP, phishing, credits, receipts, SMS mirrors, and future-dated
- * transactions. Debit tense and meaning (actual vs upcoming) are decided by TFLite afterward.
+ * Static safety rules only — OTP, phishing, credits, receipts, confirmed bank debits, and
+ * future-dated transactions. Debit tense and meaning (actual vs upcoming) are decided by TFLite
+ * when static rules do not apply.
  */
 class MessageClassificationRules @Inject constructor(
     private val configRepository: ClassificationConfigRepository,
@@ -48,11 +49,14 @@ class MessageClassificationRules @Inject constructor(
         if (compiled.receiptPattern.containsMatchIn(lower)) {
             return result(MessageType.Receipt, 97, "purchase_receipt")
         }
-        if (isMessagingAppMirror(input, compiled)) {
-            return result(MessageType.Unknown, 92, "sms_mirror_notification")
-        }
         if (isFutureTransaction(input.rawText, input.receivedAtMillis)) {
             return result(MessageType.FutureDebit, 94, "future_transaction_date")
+        }
+        if (containsAny(lower, compiled.config.futureDebitKeywords)) {
+            return result(MessageType.FutureDebit, 93, "future_debit_keyword")
+        }
+        if (isConfirmedActualBankDebit(input.rawText, compiled)) {
+            return result(MessageType.ActualDebit, 95, "confirmed_bank_debit")
         }
         if (isSuspiciousLinkPhishing(input, compiled)) {
             return result(MessageType.PhishingSpam, 96, "phishing_suspicious_link")
@@ -75,12 +79,19 @@ class MessageClassificationRules @Inject constructor(
     private fun containsAny(text: String, keywords: List<String>): Boolean =
         keywords.any(text::contains)
 
-    private fun isMessagingAppMirror(input: MessageClassificationInput, compiled: CompiledClassificationRules): Boolean {
-        if (input.source != "Notification") return false
-        val pkg = input.notificationPackage ?: return false
-        if (pkg !in compiled.config.messagingAppPackages) return false
-        return compiled.bankSmsPrefixPattern.matcher(input.rawText).find() ||
-            compiled.sentFromAccountPattern.matcher(input.rawText).find()
+    private fun isConfirmedActualBankDebit(text: String, compiled: CompiledClassificationRules): Boolean {
+        val lower = text.lowercase(Locale.US)
+        if (!compiled.amountPattern.containsMatchIn(lower)) return false
+
+        if (compiled.sentFromAccountPattern.matcher(text).find()) return true
+
+        val hasDebitSignal = compiled.debitBodyPattern.containsMatchIn(lower) ||
+            SENT_RUPEES_PATTERN.containsMatchIn(text)
+        if (!hasDebitSignal) return false
+
+        return compiled.bankSmsPrefixPattern.matcher(text).find() ||
+            (compiled.bankBodyPattern.containsMatchIn(lower) && compiled.accountBodyPattern.containsMatchIn(lower)) ||
+            (compiled.debitPattern.containsMatchIn(lower) && compiled.accountBodyPattern.containsMatchIn(lower))
     }
 
     private fun isSuspiciousLinkPhishing(
@@ -132,6 +143,8 @@ class MessageClassificationRules @Inject constructor(
         MessageClassificationResult(type = type, confidence = confidence, reason = reason)
 
     companion object {
+        private val SENT_RUPEES_PATTERN = Regex("\\bsent\\s+rs", RegexOption.IGNORE_CASE)
+
         private val COMPACT_DATE = Regex(
             "\\b([0-3]?\\d)(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\\d{2,4})\\b",
             RegexOption.IGNORE_CASE

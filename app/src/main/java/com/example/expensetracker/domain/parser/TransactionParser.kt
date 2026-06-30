@@ -24,9 +24,9 @@ class TransactionParser @Inject constructor() {
             RegexOption.IGNORE_CASE
         ),
         Regex(";\\s*([A-Za-z0-9 @._-]+?)\\s+credited", RegexOption.IGNORE_CASE),
-        Regex("\\b(?:paid|sent|spent|transferred)\\s+(?:to|at)\\s+([A-Za-z0-9 &._-]{2,40})", RegexOption.IGNORE_CASE),
-        Regex("\\b(?:to|at)\\s+([A-Za-z0-9@ &._-]{2,40}?)(?:\\s+on|\\s+via|\\s+ref|\\.|,|$)", RegexOption.IGNORE_CASE),
-        Regex("\\bfrom\\s+([A-Za-z0-9 &._-]{2,40}?)(?:\\s+on|\\s+via|\\s+ref|\\.|,|$)", RegexOption.IGNORE_CASE),
+        Regex("\\b(?:paid|sent|spent|transferred)\\s+(?:to|at)\\s+([A-Za-z0-9@ &._-]{2,40})", RegexOption.IGNORE_CASE),
+        Regex("\\b(?:to|at)\\s+([A-Za-z0-9@ &._-]{2,80}?)(?:\\s+on|\\s+via|\\s+ref|,|$)", RegexOption.IGNORE_CASE),
+        Regex("\\bfrom\\s+([A-Za-z0-9 &._-]{2,40}?)(?:\\s+on|\\s+via|\\s+ref|,|$)", RegexOption.IGNORE_CASE),
         Regex("\\b(?:merchant|payee|beneficiary|receiver)\\s*[:\\-]\\s*([A-Za-z0-9 &._-]{2,40})", RegexOption.IGNORE_CASE),
         Regex("\\b(?:payment\\s+(?:to|for)|upi\\s+(?:to|payment\\s+to))\\s+([A-Za-z0-9 &._-]{2,40})", RegexOption.IGNORE_CASE)
     )
@@ -109,7 +109,7 @@ class TransactionParser @Inject constructor() {
 
     private fun String.cleanupMerchant(): String =
         replace(Regex("\\b(on|via|ref|upi|a/c|account|bank|txn|transaction).*$", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("[^A-Za-z0-9 &._-]"), "")
+            .replace(Regex("[^A-Za-z0-9@ &._-]"), "")
             .trim()
             .ifBlank { "Unknown Merchant" }
 

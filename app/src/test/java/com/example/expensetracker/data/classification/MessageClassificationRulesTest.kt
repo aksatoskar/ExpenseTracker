@@ -22,7 +22,7 @@ class MessageClassificationRulesTest {
     }
 
     @Test
-    fun defersDebitCandidatesToMl() {
+    fun classifiesFederalBankDebitAsActualDebit() {
         val receivedAt = java.time.LocalDate.of(2026, 6, 27)
             .atStartOfDay(java.time.ZoneId.systemDefault())
             .toInstant()
@@ -38,22 +38,52 @@ class MessageClassificationRulesTest {
             )
         )
 
-        assertNull(result)
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= MessageClassificationResult.NOTIFY_THRESHOLD)
+        assertEquals("confirmed_bank_debit", result.reason)
     }
 
     @Test
-    fun rejectsMessagingAppBankSmsMirror() {
+    fun confirmsActualDebitForMessagingAppBankSms() {
+        val receivedAt = java.time.LocalDate.of(2026, 6, 30)
+            .atStartOfDay(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "Sent Rs.18000.00 From HDFC Bank A/C *4915 To mr.mayurdeshpande-4@okaxi " +
+                    "On 30/06/26 Ref 618173294378 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808",
+                source = "Notification",
+                receivedAtMillis = receivedAt,
+                notificationPackage = "com.google.android.apps.messaging"
+            )
+        )
+
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= MessageClassificationResult.NOTIFY_THRESHOLD)
+        assertEquals("confirmed_bank_debit", result.reason)
+    }
+
+    @Test
+    fun confirmsActualDebitForMessagingAppBankSmsWithSenderPrefix() {
+        val receivedAt = java.time.LocalDate.of(2026, 6, 25)
+            .atStartOfDay(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
         val result = rules.evaluate(
             MessageClassificationInput(
                 rawText = "JM-HDFCBK-S Sent Rs.6.00 From HDFC Bank A/C *4915 To AKSHAY MEGASHYAM SATOSKA " +
                     "On 25/06/26 Ref 654207042327 Not You? Call 18002586161",
                 source = "Notification",
-                receivedAtMillis = 1_750_000_000_000L,
+                receivedAtMillis = receivedAt,
                 notificationPackage = "com.google.android.apps.messaging"
             )
         )
 
-        assertEquals(MessageType.Unknown, result?.type)
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= MessageClassificationResult.NOTIFY_THRESHOLD)
     }
 
     @Test
@@ -76,7 +106,7 @@ class MessageClassificationRulesTest {
     }
 
     @Test
-    fun defersGrowwSipReminderToMl() {
+    fun rejectsGrowwSipReminderAsFutureDebit() {
         val result = rules.evaluate(
             MessageClassificationInput(
                 rawText = "SIP: Instalment due in 2 days ₹20,000.00 will be deducted for " +
@@ -87,7 +117,8 @@ class MessageClassificationRulesTest {
             )
         )
 
-        assertNull(result)
+        assertEquals(MessageType.FutureDebit, result?.type)
+        assertEquals("future_debit_keyword", result?.reason)
     }
 
     @Test

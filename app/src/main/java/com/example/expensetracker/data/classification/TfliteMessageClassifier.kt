@@ -10,8 +10,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Static rules handle only unambiguous safety cases (OTP, phishing, credits, receipts, mirrors).
- * All debit-looking messages are classified by TFLite for actual vs future vs other meaning.
+ * Static rules handle unambiguous safety cases (OTP, phishing, credits, receipts) and well-known
+ * completed bank debits. Remaining debit-looking messages are classified by TFLite.
  */
 @Singleton
 class TfliteMessageClassifier @Inject constructor(
