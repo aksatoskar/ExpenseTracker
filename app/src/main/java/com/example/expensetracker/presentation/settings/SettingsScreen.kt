@@ -315,7 +315,7 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
         item {
             PermissionStatusCard(
                 title = "Battery Optimization",
-                description = "Prevents the system from stopping background detection",
+                description = "Recommended for SMS detection when the app is closed. Daily 9 PM summaries use a system alarm and still fire without this.",
                 enabled = batteryOk,
                 actionLabel = "Disable",
                 onAction = { context.startActivity(PermissionHelper.batteryOptimizationIntent(context)) }

@@ -37,6 +37,17 @@
         </receiver>
 
         <receiver
+            android:name=".receivers.DailyReminderAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.expensetracker.DAILY_REMINDER_ALARM" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIME_CHANGED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".receivers.BootReceiver"
             android:exported="false">
             <intent-filter>
