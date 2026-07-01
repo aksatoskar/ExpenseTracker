@@ -67,7 +67,7 @@
   "bank_entity_hint_pattern": "BANK|BNK|BK|INB|FIN|SBI|SBIN|HDFC|ICICI|AXIS|KOTAK|PNB|BOB|CANARA|UNION|FED|YES|IDFC|INDUS|RBL|AUUB|CSB|SCB|DBS|CITI|HSBC|UCO|IOB|BOI|PSB|MAHB|BAND|KVB|SIB",
   "payment_app_hint_pattern": "PHONEPE|PAYTM|GPAY|GOOGLEPAY|AMAZONPAY|BHIM|CRED|MOBIKWIK|FREECHARGE",
   "bank_body_pattern": "\\b([a-z][a-z ]{0,24}bank|hdfc|icici|axis|sbi|state bank|kotak|federal bank|yes bank|idfc|indusind|punjab national|bank of baroda|canara|union bank|indian bank|uco bank|central bank|bandhan|rbl bank|dcb bank|karur vysya|south indian bank)\\b",
-  "account_body_pattern": "\\b(acct|a/c|account|card x\\d|card \\*\\d|\\*[xX]\\d{3,6})\\b",
+    "account_body_pattern": "\\b(acct|a/c|account|card x\\d|card \\*\\d|\\*[xX]\\d{3,6}|[xX]{2}\\d{3,6})\\b",
   "debit_body_pattern": "\\b(debited|withdrawn|spent|deducted|dr\\b)",
   "otp_pattern": "\\botp\\b|one time password|verification code|authentication code|do not share otp",
   "phishing_pattern": "click here|bit\\.ly|tinyurl|verify kyc|update pan|account blocked|account frozen|loan approved|claim reward|win money|lottery|congratulations! win|unlock your bank",

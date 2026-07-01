@@ -20,6 +20,14 @@ class TransactionParser @Inject constructor() {
     )
     private val merchantRegexes = listOf(
         Regex(
+            "\\bInfo:\\s*ACH\\s+D-\\s*([A-Za-z0-9 &]+?)-[A-Z0-9]{4,}",
+            RegexOption.IGNORE_CASE
+        ),
+        Regex(
+            "\\bInfo:\\s*([A-Za-z0-9 &._-]+?)(?:\\.\\s*Avl|\\s+Avl\\b|-[A-Z0-9]{6,})",
+            RegexOption.IGNORE_CASE
+        ),
+        Regex(
             "\\b(?:withdrawn|spent)\\s+(?:Rs\\.?|INR|₹)\\s*[0-9,.]+\\s+From\\s+[A-Za-z ]+\\s+(?:Card|A/C)\\s+\\S+\\s+At\\s+\\+?(.+?)\\s+On\\s+\\d{4}",
             RegexOption.IGNORE_CASE
         ),

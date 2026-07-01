@@ -67,6 +67,21 @@ class TransactionParserTest {
     }
 
     @Test
+    fun parsesHdfcAchDebitWithInfoLine() {
+        val parsed = parser.parse(
+            "UPDATE: INR 20,000.00 debited from HDFC Bank XX4915 on 01-JUL-26. " +
+                "Info: ACH D- Indian Clearing Corp-0000Q512XZ4X. Avl bal:INR 2,69,143.43",
+            "SMS",
+            1_000L
+        )
+
+        assertNotNull(parsed)
+        assertEquals(2_000_000L, parsed!!.amountPaise)
+        assertEquals("Indian Clearing Corp", parsed.merchant)
+        assertEquals(TransactionType.Debit, parsed.type)
+    }
+
+    @Test
     fun parsesHdfcSentFromAccountDebitSms() {
         val parsed = parser.parse(
             "Sent Rs.3580.00 From HDFC Bank A/C *4915 To SHREEDEVA FOODS On 28/06/26 " +

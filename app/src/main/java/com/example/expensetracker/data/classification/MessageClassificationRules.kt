@@ -84,6 +84,7 @@ class MessageClassificationRules @Inject constructor(
         if (!compiled.amountPattern.containsMatchIn(lower)) return false
 
         if (compiled.sentFromAccountPattern.matcher(text).find()) return true
+        if (DEBITED_FROM_BANK_PATTERN.containsMatchIn(lower)) return true
 
         val hasDebitSignal = compiled.debitBodyPattern.containsMatchIn(lower) ||
             SENT_RUPEES_PATTERN.containsMatchIn(text)
@@ -144,6 +145,10 @@ class MessageClassificationRules @Inject constructor(
 
     companion object {
         private val SENT_RUPEES_PATTERN = Regex("\\bsent\\s+rs", RegexOption.IGNORE_CASE)
+        private val DEBITED_FROM_BANK_PATTERN = Regex(
+            "\\bdebited\\s+from\\s+[a-z0-9 ]+bank\\b",
+            RegexOption.IGNORE_CASE
+        )
 
         private val COMPACT_DATE = Regex(
             "\\b([0-3]?\\d)(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\\d{2,4})\\b",

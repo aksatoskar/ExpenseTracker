@@ -87,6 +87,29 @@ class MessageClassificationRulesTest {
     }
 
     @Test
+    fun confirmsActualDebitForHdfcAchDebitSms() {
+        val receivedAt = java.time.LocalDate.of(2026, 7, 1)
+            .atTime(9, 17)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        val result = rules.evaluate(
+            MessageClassificationInput(
+                rawText = "UPDATE: INR 20,000.00 debited from HDFC Bank XX4915 on 01-JUL-26. " +
+                    "Info: ACH D- Indian Clearing Corp-0000Q512XZ4X. Avl bal:INR 2,69,143.43",
+                source = "SMS",
+                receivedAtMillis = receivedAt,
+                sender = "VM-HDFCBK-S"
+            )
+        )
+
+        assertEquals(MessageType.ActualDebit, result?.type)
+        assertTrue(result!!.confidence >= MessageClassificationResult.NOTIFY_THRESHOLD)
+        assertEquals("confirmed_bank_debit", result.reason)
+    }
+
+    @Test
     fun rejectsFutureTransactionDate() {
         val receivedAt = java.time.LocalDate.of(2025, 6, 25)
             .atStartOfDay(java.time.ZoneId.systemDefault())
