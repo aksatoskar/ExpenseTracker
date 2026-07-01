@@ -1,73 +1,71 @@
 package com.example.expensetracker.sync
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.example.expensetracker.MainActivity
-import com.example.expensetracker.receivers.DailyReminderAlarmReceiver
+import java.time.Duration
 import java.time.LocalDateTime
-import java.time.ZoneId
+import java.util.concurrent.TimeUnit
 
-/**
- * Schedules the 9 PM daily digest and pending-review reminder using [AlarmManager.setAlarmClock].
- *
- * Alarm-clock alarms are treated as user-visible and continue to fire under Doze, app standby,
- * and battery optimization — unlike [WorkManager] periodic jobs which OEMs often defer for hours.
- */
+/** Schedules the daily 9 PM digest and pending-review reminder via strict periodic WorkManager. */
 object DailyReminderScheduler {
 
-    const val ACTION_DAILY_REMINDER = "com.example.expensetracker.DAILY_REMINDER_ALARM"
-    const val DIGEST_WORK_NAME = "daily-expense-digest"
-    private const val ALARM_REQUEST_CODE = 90_001
+    const val DAILY_REMINDER_WORK_NAME = "daily-reminder"
+    private const val LEGACY_DIGEST_WORK_NAME = "daily-expense-digest"
+    private const val LEGACY_PENDING_REVIEW_WORK_NAME = "daily-pending-review-reminder"
 
-    /** @param replaceExisting unused; kept for call-site compatibility with boot/update handlers. */
+    private val reminderConstraints: Constraints = Constraints.Builder()
+        .setRequiresBatteryNotLow(false)
+        .setRequiresCharging(false)
+        .setRequiresDeviceIdle(false)
+        .setRequiresStorageNotLow(false)
+        .build()
+
     fun schedule(context: Context, replaceExisting: Boolean = false) {
+        val policy = if (replaceExisting) {
+            ExistingPeriodicWorkPolicy.UPDATE
+        } else {
+            ExistingPeriodicWorkPolicy.KEEP
+        }
+        val ninePmDelay = millisUntilNextNinePm()
+
+        WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
+            DAILY_REMINDER_WORK_NAME,
+            policy,
+            buildStrictDailyPeriodicWork(ninePmDelay)
+        )
         cancelLegacyPeriodicWork(context)
-
-        val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
-        val triggerAtMillis = nextNinePmMillis()
-        val alarmIntent = alarmPendingIntent(context)
-        val showIntent = PendingIntent.getActivity(
-            context,
-            ALARM_REQUEST_CODE + 1,
-            MainActivity.intent(context),
-            pendingIntentFlags()
-        )
-
-        alarmManager.setAlarmClock(
-            AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent),
-            alarmIntent
-        )
     }
 
+    /**
+     * 24 h repeat with a 5-minute flex window (WorkManager minimum). Avoids the default 12-hour
+     * flex for 24-hour work, so the job runs near the end of each daily interval (~9 PM).
+     */
+    private fun buildStrictDailyPeriodicWork(initialDelayMillis: Long): PeriodicWorkRequest =
+        PeriodicWorkRequestBuilder<DailyReminderWorker>(
+            repeatInterval = 24,
+            repeatIntervalTimeUnit = TimeUnit.HOURS,
+            flexTimeInterval = 5,
+            flexTimeIntervalUnit = TimeUnit.MINUTES
+        )
+            .setInitialDelay(initialDelayMillis, TimeUnit.MILLISECONDS)
+            .setConstraints(reminderConstraints)
+            .build()
+
     private fun cancelLegacyPeriodicWork(context: Context) {
-        WorkManager.getInstance(context).apply {
-            cancelUniqueWork(DIGEST_WORK_NAME)
-            cancelUniqueWork(PendingReviewReminderWorker.WORK_NAME)
+        WorkManager.getInstance(context.applicationContext).apply {
+            cancelUniqueWork(LEGACY_DIGEST_WORK_NAME)
+            cancelUniqueWork(LEGACY_PENDING_REVIEW_WORK_NAME)
         }
     }
 
-    private fun alarmPendingIntent(context: Context): PendingIntent {
-        val intent = Intent(context, DailyReminderAlarmReceiver::class.java)
-            .setAction(ACTION_DAILY_REMINDER)
-        return PendingIntent.getBroadcast(
-            context,
-            ALARM_REQUEST_CODE,
-            intent,
-            pendingIntentFlags()
-        )
-    }
-
-    private fun pendingIntentFlags(): Int =
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-
-    private fun nextNinePmMillis(): Long {
-        val zone = ZoneId.systemDefault()
-        val now = LocalDateTime.now(zone)
+    private fun millisUntilNextNinePm(): Long {
+        val now = LocalDateTime.now()
         val todayNinePm = now.toLocalDate().atTime(21, 0)
         val next = if (now.isBefore(todayNinePm)) todayNinePm else todayNinePm.plusDays(1)
-        return next.atZone(zone).toInstant().toEpochMilli()
+        return Duration.between(now, next).toMillis().coerceAtLeast(0)
     }
 }

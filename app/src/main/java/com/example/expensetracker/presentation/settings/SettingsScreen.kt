@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +63,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.expensetracker.presentation.common.PermissionStatusCard
 import com.example.expensetracker.presentation.common.SectionHeader
 import com.example.expensetracker.presentation.common.syncTimeText
+import com.example.expensetracker.sync.DailyReminderScheduler
 import com.example.expensetracker.util.PermissionHelper
 
 /** Settings tab: theme toggle, detection-reliability permission status and privacy info. */
@@ -92,6 +94,10 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
     val appNotifications = remember(refreshKey) { PermissionHelper.areNotificationsEnabled(context) }
     val smsAccess = remember(refreshKey) { PermissionHelper.hasSmsPermission(context) }
     val batteryOk = remember(refreshKey) { PermissionHelper.isIgnoringBatteryOptimizations(context) }
+
+    LaunchedEffect(refreshKey) {
+        DailyReminderScheduler.schedule(context)
+    }
 
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         refreshKey++
@@ -315,7 +321,7 @@ fun SettingsScreen(onOpenDetectedMessages: () -> Unit = {}) {
         item {
             PermissionStatusCard(
                 title = "Battery Optimization",
-                description = "Recommended for SMS detection when the app is closed. Daily 9 PM summaries use a system alarm and still fire without this.",
+                description = "Recommended for reliable SMS detection when the app is closed",
                 enabled = batteryOk,
                 actionLabel = "Disable",
                 onAction = { context.startActivity(PermissionHelper.batteryOptimizationIntent(context)) }
